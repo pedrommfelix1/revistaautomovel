@@ -1,0 +1,37 @@
+# Project TODO
+
+- [x] Criar o modelo persistente de categorias, artigos, secções editoriais e imagens de galeria.
+- [x] Implementar procedimentos públicos para listar artigos publicados, categorias e artigos por slug.
+- [x] Implementar procedimentos protegidos de autor/admin para criar, editar, publicar e gerir artigos.
+- [x] Implementar carregamento de imagens para armazenamento persistente e associação de metadados às galerias.
+- [x] Criar a identidade visual International Typographic Style, incluindo acentos quadrados vermelhos, grelha assimétrica, tipografia sem serifa e divisórias pretas.
+- [x] Construir a página inicial pública com destaque, artigos recentes, categorias e layouts editoriais responsivos.
+- [x] Construir a página de artigo com título, subtítulo, autoria, data, imagem de abertura, capítulos, capitular, citações destacadas e legendas.
+- [x] Criar uma galeria até 100 imagens por artigo com legendas, carregamento eficiente e visualização em ecrã inteiro.
+- [x] Criar a área autenticada de autor/admin para gerir o conteúdo e o estado de publicação.
+- [x] Criar testes Vitest para validação editorial e permissões de publicação, incluindo autor, administrador, publicação e rascunhos públicos.
+- [x] Verificar os percursos público e de administração em desktop e mobile, corrigindo o carregamento inicial das primeiras imagens da galeria.
+- [x] Alinhar os títulos de capítulo e os respetivos blocos de texto no mesmo eixo de leitura, em desktop e mobile.
+- [x] Corrigir o erro de React por alteração da ordem de hooks na página de artigo.
+- [x] Alinhar título principal, capítulos e texto no mesmo eixo de leitura do artigo.
+- [x] Impedir que palavras e sequências longas sem espaços criem deslocamento horizontal na página.
+- [x] Aplicar e validar quebra segura em títulos, capítulos e citações longas do artigo.
+- [x] Criar pesquisa editorial pública por título, subtítulo, autoria e categorias.
+- [x] Implementar reordenação por arrastar de secções de texto e imagens da galeria no editor.
+- [x] Adicionar campos persistentes de SEO por artigo para título, descrição, imagem e metadados sociais no navegador.
+- [x] Criar uma pré-visualização editorial de partilha para redes sociais na área de edição.
+- [x] Testar a pesquisa, a persistência SEO e a ordenação antes de entregar a atualização.
+- [x] Impedir títulos duplicados em artigos novos e existentes, com validação no servidor.
+- [x] Permitir apagar rascunhos na redação, apenas por utilizadores autorizados e com confirmação.
+- [x] Testar unicidade de títulos, permissões e eliminação segura de rascunhos.
+- [x] Mostrar erro explícito quando a eliminação de rascunho falhar e validar a confirmação no navegador.
+- [x] Testar conflito de título ao editar um artigo existente.
+- [x] Testar bloqueio de eliminação de rascunho por utilizador sem autorização.
+- [x] Adicionar a ação “Apagar rascunho” diretamente no editor de artigo aberto.
+- [x] Confirmar a eliminação no editor, regressar à redação e atualizar a lista após sucesso.
+- [x] Testar o fluxo de eliminação a partir do editor.
+- [ ] Criar um novo repositório GitHub para o projeto Motor de Linha.
+- [ ] Enviar o código atual para o novo repositório sem ficheiros de ambiente ou segredos.
+- [ ] Confirmar o endereço remoto e a publicação do conteúdo no GitHub.
+- [ ] Resolver o bloqueio em que a autorização GitHub é guardada mas a integração permanece desligada.
+- [ ] Avaliar exportação alternativa do projeto caso a integração GitHub continue indisponível.
