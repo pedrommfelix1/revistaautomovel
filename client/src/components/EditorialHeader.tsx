@@ -2,15 +2,14 @@ import { Menu, Search, X } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
 
-type EditorialCategory = { id: number; name: string; slug: string };
+const mainTabs = [
+  { label: "Notícias", href: "/noticias" },
+  { label: "Multimédia", href: "/multimedia" },
+  { label: "Contactos", href: "/contactos" },
+];
 
-export function EditorialHeader({ categories = [] }: { categories?: EditorialCategory[] }) {
+export function EditorialHeader() {
   const [open, setOpen] = useState(false);
-  const links = categories.length ? categories : [
-    { id: 1, name: "Ensaios", slug: "ensaios" },
-    { id: 2, name: "Design", slug: "design" },
-    { id: 3, name: "Cultura", slug: "cultura" },
-  ];
 
   return (
     <header className="border-b border-black bg-white">
@@ -33,7 +32,7 @@ export function EditorialHeader({ categories = [] }: { categories?: EditorialCat
         </Link>
 
         <nav aria-label="Navegação principal" className="hidden items-center gap-6 text-[11px] font-bold uppercase tracking-[0.12em] md:flex">
-          {links.map((category) => <Link key={category.id} href={`/categoria/${category.slug}`} className="nav-link">{category.name}</Link>)}
+          {mainTabs.map((tab) => <Link key={tab.href} href={tab.href} className="nav-link">{tab.label}</Link>)}
           <Link href="/redacao" className="nav-link">Redação</Link>
         </nav>
 
@@ -45,9 +44,9 @@ export function EditorialHeader({ categories = [] }: { categories?: EditorialCat
       {open && (
         <nav aria-label="Navegação móvel" className="border-t border-black bg-white px-5 py-5 md:hidden">
           <div className="editorial-shell grid gap-1 px-0">
-            {links.map((category, index) => (
-              <Link key={category.id} onClick={() => setOpen(false)} href={`/categoria/${category.slug}`} className="mobile-nav-link">
-                <span className="font-mono text-[10px] text-[#f0372f]">0{index + 1}</span>{category.name}
+            {mainTabs.map((tab, index) => (
+              <Link key={tab.href} onClick={() => setOpen(false)} href={tab.href} className="mobile-nav-link">
+                <span className="font-mono text-[10px] text-[#f0372f]">0{index + 1}</span>{tab.label}
               </Link>
             ))}
             <Link onClick={() => setOpen(false)} href="/redacao" className="mobile-nav-link"><span className="font-mono text-[10px] text-[#f0372f]">04</span>Redação</Link>

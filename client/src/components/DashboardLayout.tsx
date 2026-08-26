@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { FilePenLine, House, LogOut, PanelLeft, PenSquare } from "lucide-react";
+import { FilePenLine, House, Images, LogOut, PanelLeft } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -29,7 +29,7 @@ import { Button } from "./ui/button";
 
 const menuItems = [
   { icon: FilePenLine, label: "Artigos", path: "/redacao" },
-  { icon: PenSquare, label: "Novo artigo", path: "/redacao/novo" },
+  { icon: Images, label: "Multimédia", path: "/redacao/multimedia" },
   { icon: House, label: "Ver site", path: "/" },
 ];
 
@@ -58,6 +58,14 @@ export default function DashboardLayout({
   }
 
   if (!user) {
+    if (import.meta.env.DEV) {
+      // Local dev: the real Manus OAuth login can't complete against
+      // localhost, so sign in automatically as the site owner instead of
+      // showing the login gate.
+      window.location.href = "/api/dev/login";
+      return <DashboardLayoutSkeleton />;
+    }
+
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">

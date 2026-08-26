@@ -3,6 +3,7 @@ import { parse as parseCookieHeader } from "cookie";
 import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
+import { ENV } from "./env";
 import { sdk } from "./sdk";
 
 function getQueryParam(req: Request, key: string): string | undefined {
@@ -62,4 +63,36 @@ export function registerOAuthRoutes(app: Express) {
       res.status(500).json({ error: "OAuth callback failed" });
     }
   });
+
+  // Local-dev-only shortcut: the real Manus OAuth flow can't complete against
+  // http://localhost (redirect URI isn't registered there). Never reachable
+  // once NODE_ENV=production, so it can't leak into a real deployment.
+  if (!ENV.isProduction) {
+    app.get("/api/dev/login", async (req: Request, res: Response) => {
+      if (!ENV.ownerOpenId) {
+        res.status(500).json({ error: "OWNER_OPEN_ID not configured" });
+        return;
+      }
+
+      try {
+        await db.upsertUser({
+          openId: ENV.ownerOpenId,
+          name: "Pedro Félix",
+          lastSignedIn: new Date(),
+        });
+
+        const sessionToken = await sdk.createSessionToken(ENV.ownerOpenId, {
+          name: "Pedro Félix",
+          expiresInMs: ONE_YEAR_MS,
+        });
+
+        const cookieOptions = getSessionCookieOptions(req);
+        res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        res.redirect(302, "/redacao");
+      } catch (error) {
+        console.error("[Dev login] Failed", error);
+        res.status(500).json({ error: "Dev login failed" });
+      }
+    });
+  }
 }

@@ -39,10 +39,14 @@ export function getSessionCookieOptions(
   //       ? hostname
   //       : undefined;
 
+  // SameSite=None is only valid alongside Secure — browsers silently drop the
+  // cookie otherwise. Plain http (e.g. local dev on http://localhost) can't
+  // set Secure, so fall back to Lax there so the session cookie actually sticks.
+  const secure = isSecureRequest(req);
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    sameSite: secure ? "none" : "lax",
+    secure,
   };
 }

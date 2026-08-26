@@ -185,4 +185,23 @@ describe("editorial publication router", () => {
 
     expect(editorialDb.replaceArticleSections).toHaveBeenCalledWith(7, sections);
   });
+
+  it("rejects saving more than 3 images in an article's embedded gallery", async () => {
+    const caller = appRouter.createCaller(createContext(12, "user"));
+    const images = [0, 1, 2, 3].map((position) => ({ url: `/manus-storage/${position}.jpg`, position }));
+
+    await expect(caller.editorial.manage.saveImages({ id: 7, images })).rejects.toThrow();
+    expect(editorialDb.replaceArticleImages).not.toHaveBeenCalled();
+  });
+
+  it("saves up to 3 images in an article's embedded gallery", async () => {
+    editorialDb.findArticleById.mockResolvedValue({ id: 7, authorId: 12 });
+    editorialDb.getArticleWithContent.mockResolvedValue({ id: 7, images: [] });
+    const caller = appRouter.createCaller(createContext(12, "user"));
+    const images = [0, 1, 2].map((position) => ({ url: `/manus-storage/${position}.jpg`, position }));
+
+    await caller.editorial.manage.saveImages({ id: 7, images });
+
+    expect(editorialDb.replaceArticleImages).toHaveBeenCalledWith(7, images);
+  });
 });

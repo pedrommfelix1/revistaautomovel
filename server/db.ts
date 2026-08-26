@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { articleCategories, articleImages, articles, articleSections, categories, InsertUser, users } from "../drizzle/schema";
+import { articleCategories, articleImages, articles, articleSections, categories, InsertUser, siteGalleryImages, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -297,4 +297,23 @@ export async function setArticleStatus(articleId: number, status: "draft" | "pub
 export async function deleteArticle(articleId: number) {
   const db = await requireDb();
   await db.delete(articles).where(eq(articles.id, articleId));
+}
+
+export async function listSiteGalleryImages() {
+  const db = await requireDb();
+  return db.select().from(siteGalleryImages).orderBy(asc(siteGalleryImages.position));
+}
+
+export async function replaceSiteGalleryImages(imageRows: ImageInput[]) {
+  const db = await requireDb();
+  await db.delete(siteGalleryImages);
+  if (imageRows.length) {
+    await db.insert(siteGalleryImages).values(imageRows.map((image) => ({
+      url: image.url,
+      storageKey: image.storageKey ?? null,
+      altText: image.altText ?? null,
+      caption: image.caption ?? null,
+      position: image.position,
+    })));
+  }
 }

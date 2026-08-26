@@ -30,8 +30,15 @@
 - [x] Adicionar a ação “Apagar rascunho” diretamente no editor de artigo aberto.
 - [x] Confirmar a eliminação no editor, regressar à redação e atualizar a lista após sucesso.
 - [x] Testar o fluxo de eliminação a partir do editor.
-- [ ] Criar um novo repositório GitHub para o projeto Motor de Linha.
-- [ ] Enviar o código atual para o novo repositório sem ficheiros de ambiente ou segredos.
-- [ ] Confirmar o endereço remoto e a publicação do conteúdo no GitHub.
+- [x] Criar um novo repositório GitHub para o projeto Motor de Linha.
+- [x] Enviar o código atual para o novo repositório sem ficheiros de ambiente ou segredos.
+- [x] Confirmar o endereço remoto e a publicação do conteúdo no GitHub.
 - [ ] Resolver o bloqueio em que a autorização GitHub é guardada mas a integração permanece desligada.
 - [ ] Avaliar exportação alternativa do projeto caso a integração GitHub continue indisponível.
+- [x] Limitar a galeria embutida no artigo a um máximo de 3 imagens de destaque.
+- [x] Criar uma galeria do site independente dos artigos, com até 100 imagens, página pública `/galeria` e gestão em `/redacao/galeria` (apenas administradores).
+- [x] Testar o novo limite de 3 imagens por artigo e as permissões da galeria do site.
+- [x] Substituir a navegação por categorias por abas fixas: Notícias, Multimédia e Contactos (Revista fica pendente para mais tarde).
+- [x] Criar a página Notícias com todos os artigos publicados e filtro por categoria.
+- [x] Renomear a galeria do site para Multimédia (rotas `/multimedia` e `/redacao/multimedia`).
+- [x] Criar a página Contactos com informação de contacto placeholder.

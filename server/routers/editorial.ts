@@ -38,7 +38,7 @@ const imageInput = z.object({
   storageKey: z.string().max(600).nullable().optional(),
   altText: z.string().max(250).nullable().optional(),
   caption: z.string().max(600).nullable().optional(),
-  position: z.number().int().min(0).max(99),
+  position: z.number().int().min(0).max(2),
 });
 
 const metadataInput = z.object({
@@ -85,6 +85,7 @@ export const editorialRouter = router({
   categories: publicProcedure.query(() => listCategories()),
   featured: publicProcedure.query(() => listFeaturedArticles()),
   latest: publicProcedure.input(z.object({ limit: z.number().int().min(1).max(24).default(9) }).optional()).query(({ input }) => listLatestArticles(input?.limit ?? 9)),
+  all: publicProcedure.query(() => listLatestArticles(500)),
   bySlug: publicProcedure.input(z.object({ slug: z.string().min(1).max(180) })).query(({ input }) => getPublishedArticleBySlug(input.slug)),
   byCategory: publicProcedure.input(z.object({ slug: z.string().min(1).max(100) })).query(({ input }) => listArticlesInCategory(input.slug)),
   search: publicProcedure.input(z.object({ query: z.string().min(2).max(100) })).query(({ input }) => searchPublishedArticles(input.query)),
@@ -118,7 +119,7 @@ export const editorialRouter = router({
       await replaceArticleSections(input.id, input.sections);
       return getArticleWithContent(input.id);
     }),
-    saveImages: protectedProcedure.input(z.object({ id: z.number().int().positive(), images: z.array(imageInput).max(100) })).mutation(async ({ ctx, input }) => {
+    saveImages: protectedProcedure.input(z.object({ id: z.number().int().positive(), images: z.array(imageInput).max(3) })).mutation(async ({ ctx, input }) => {
       await assertCanManageArticle(ctx, input.id);
       await replaceArticleImages(input.id, input.images);
       return getArticleWithContent(input.id);

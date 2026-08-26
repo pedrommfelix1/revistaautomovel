@@ -10,8 +10,9 @@ export function EditorialFooter() {
         </div>
         <div className="grid grid-cols-2 gap-4 text-[11px] font-bold uppercase tracking-[0.13em]">
           <Link href="/" className="footer-link">Início</Link>
-          <Link href="/categoria/ensaios" className="footer-link">Ensaios</Link>
-          <Link href="/categoria/design" className="footer-link">Design</Link>
+          <Link href="/noticias" className="footer-link">Notícias</Link>
+          <Link href="/multimedia" className="footer-link">Multimédia</Link>
+          <Link href="/contactos" className="footer-link">Contactos</Link>
           <Link href="/redacao" className="footer-link">Redação</Link>
         </div>
       </div>

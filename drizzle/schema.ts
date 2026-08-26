@@ -75,6 +75,15 @@ export const articleImages = mysqlTable("articleImages", {
   position: int("position").notNull(),
 }, (table) => [index("article_images_position_idx").on(table.articleId, table.position)]);
 
+export const siteGalleryImages = mysqlTable("siteGalleryImages", {
+  id: int("id").autoincrement().primaryKey(),
+  url: text("url").notNull(),
+  storageKey: varchar("storageKey", { length: 600 }),
+  altText: varchar("altText", { length: 250 }),
+  caption: text("caption"),
+  position: int("position").notNull(),
+}, (table) => [index("site_gallery_position_idx").on(table.position)]);
+
 export const articleCategories = mysqlTable("articleCategories", {
   articleId: int("articleId").notNull().references(() => articles.id, { onDelete: "cascade" }),
   categoryId: int("categoryId").notNull().references(() => categories.id, { onDelete: "cascade" }),
