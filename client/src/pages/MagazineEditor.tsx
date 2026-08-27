@@ -11,35 +11,60 @@ import { toast } from "sonner";
 
 type MagazineIssue = { id: number; title: string; coverImageUrl: string | null };
 
-function uploadMagazinePdf(
+// Vercel's serverless functions reject any request body over ~4.5MB with a
+// 413 — a platform limit, not something our own server config can raise.
+// So the file travels in small chunks instead of one shot; the server
+// relays each chunk to a temp storage key and reassembles the full file
+// once every chunk has arrived (see server/_core/magazineUpload.ts).
+const CHUNK_SIZE = 3 * 1024 * 1024;
+
+function postWithProgress(url: string, body: Blob, onProgress?: (loaded: number) => void): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    if (onProgress) xhr.upload.onprogress = (event) => { if (event.lengthComputable) onProgress(event.loaded); };
+    xhr.onload = () => resolve(new Response(xhr.responseText, { status: xhr.status }));
+    xhr.onerror = () => reject(new Error("Falha de rede."));
+    xhr.send(body);
+  });
+}
+
+async function readErrorMessage(response: Response, fallback: string): Promise<string> {
+  try { return (await response.json())?.error ?? fallback; } catch { return fallback; }
+}
+
+async function uploadMagazinePdf(
   file: File,
   meta: { title: string; description: string; coverImageUrl: string | null; coverImageStorageKey: string | null },
   onProgress: (pct: number) => void,
 ): Promise<MagazineIssue> {
-  return new Promise((resolve, reject) => {
-    const params = new URLSearchParams({ title: meta.title, fileName: file.name });
-    if (meta.description) params.set("description", meta.description);
-    if (meta.coverImageUrl) params.set("coverImageUrl", meta.coverImageUrl);
-    if (meta.coverImageStorageKey) params.set("coverImageStorageKey", meta.coverImageStorageKey);
+  const uploadId = crypto.randomUUID();
+  const chunkCount = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+  const chunkKeys: string[] = [];
+  let uploadedBytes = 0;
 
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", `/api/magazine/upload?${params.toString()}`);
-    xhr.setRequestHeader("Content-Type", "application/pdf");
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try { resolve(JSON.parse(xhr.responseText)); }
-        catch { reject(new Error("Resposta inválida do servidor.")); }
-      } else {
-        try { reject(new Error(JSON.parse(xhr.responseText)?.error ?? `Falha ao enviar o PDF (${xhr.status})`)); }
-        catch { reject(new Error(`Falha ao enviar o PDF (${xhr.status})`)); }
-      }
-    };
-    xhr.onerror = () => reject(new Error("Falha de rede ao enviar o PDF."));
-    xhr.send(file);
+  for (let index = 0; index < chunkCount; index++) {
+    const chunk = file.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE);
+    const response = await postWithProgress(`/api/magazine/upload-chunk?uploadId=${uploadId}&index=${index}`, chunk, (loaded) => {
+      onProgress(Math.round(((uploadedBytes + loaded) / file.size) * 90));
+    });
+    if (!response.ok) throw new Error(await readErrorMessage(response, `Falha ao enviar parte ${index + 1} de ${chunkCount} (${response.status})`));
+    const { key } = await response.json();
+    chunkKeys.push(key);
+    uploadedBytes += chunk.size;
+    onProgress(Math.round((uploadedBytes / file.size) * 90));
+  }
+
+  onProgress(95);
+  const finalizeResponse = await fetch("/api/magazine/finalize", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chunkKeys, title: meta.title, description: meta.description, fileName: file.name, coverImageUrl: meta.coverImageUrl, coverImageStorageKey: meta.coverImageStorageKey }),
   });
+  if (!finalizeResponse.ok) throw new Error(await readErrorMessage(finalizeResponse, `Falha ao publicar a edição (${finalizeResponse.status})`));
+  onProgress(100);
+  return finalizeResponse.json();
 }
 
 export default function MagazineEditor() {

@@ -1,6 +1,9 @@
 {
   "buildCommand": "vite build && node_modules/.bin/esbuild server/_core/vercel.ts --platform=node --bundle --format=esm --outfile=api/index.js --packages=external",
   "outputDirectory": "dist/public",
+  "functions": {
+    "api/index.js": { "maxDuration": 60 }
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/manus-storage/(.*)", "destination": "/api/index" },

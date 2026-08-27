@@ -427,6 +427,27 @@ async function storagePut(relKey, data, contentType = "application/octet-stream"
   }
   return { key, url: `/manus-storage/${key}` };
 }
+async function storageFetchBytes(relKey) {
+  const url = await storageGetSignedUrl(relKey);
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`Storage fetch failed (${resp.status})`);
+  return Buffer.from(await resp.arrayBuffer());
+}
+async function storageGetSignedUrl(relKey) {
+  const { forgeUrl, forgeKey } = getForgeConfig();
+  const key = normalizeKey(relKey);
+  const getUrl = new URL("v1/storage/presign/get", forgeUrl + "/");
+  getUrl.searchParams.set("path", key);
+  const resp = await fetch(getUrl, {
+    headers: { Authorization: `Bearer ${forgeKey}` }
+  });
+  if (!resp.ok) {
+    const msg = await resp.text().catch(() => resp.statusText);
+    throw new Error(`Storage signed URL failed (${resp.status}): ${msg}`);
+  }
+  const { url } = await resp.json();
+  return url;
+}
 
 // shared/editorial.ts
 function toEditorialSlug(value) {
@@ -716,53 +737,82 @@ function buildCronUser(userInfo) {
 var sdk = new SDKServer();
 
 // server/_core/magazineUpload.ts
+async function requireAdmin(req, res) {
+  try {
+    const user = await sdk.authenticateRequest(req);
+    if (user.role !== "admin") {
+      res.status(403).json({ error: "Apenas administradores podem publicar edi\xE7\xF5es." });
+      return false;
+    }
+    return true;
+  } catch {
+    res.status(401).json({ error: "Sess\xE3o inv\xE1lida." });
+    return false;
+  }
+}
 function registerMagazineUploadRoute(app2) {
   app2.post(
-    "/api/magazine/upload",
-    express.raw({ type: "application/pdf", limit: "300mb" }),
+    "/api/magazine/upload-chunk",
+    express.raw({ type: "application/octet-stream", limit: "10mb" }),
     async (req, res) => {
-      try {
-        const user = await sdk.authenticateRequest(req);
-        if (user.role !== "admin") {
-          res.status(403).json({ error: "Apenas administradores podem publicar edi\xE7\xF5es." });
-          return;
-        }
-      } catch {
-        res.status(401).json({ error: "Sess\xE3o inv\xE1lida." });
-        return;
-      }
+      if (!await requireAdmin(req, res)) return;
       const body = req.body;
+      const uploadId = typeof req.query.uploadId === "string" ? req.query.uploadId : "";
+      const index2 = Number(req.query.index);
+      if (!uploadId || !Number.isInteger(index2) || index2 < 0) {
+        res.status(400).json({ error: "Par\xE2metros de upload em falta." });
+        return;
+      }
       if (!Buffer.isBuffer(body) || body.length === 0) {
-        res.status(400).json({ error: "Ficheiro PDF em falta ou vazio." });
+        res.status(400).json({ error: "Parte do ficheiro em falta ou vazia." });
         return;
       }
-      const title = typeof req.query.title === "string" ? req.query.title : "";
-      const fileName = typeof req.query.fileName === "string" ? req.query.fileName : "revista.pdf";
-      if (!title.trim()) {
-        res.status(400).json({ error: "T\xEDtulo em falta." });
-        return;
-      }
-      const description = typeof req.query.description === "string" ? req.query.description : "";
-      const coverImageUrl = typeof req.query.coverImageUrl === "string" ? req.query.coverImageUrl : null;
-      const coverImageStorageKey = typeof req.query.coverImageStorageKey === "string" ? req.query.coverImageStorageKey : null;
       try {
-        const safeName = toEditorialSlug(fileName.replace(/\.pdf$/i, "")) || "revista";
-        const asset = await storagePut(`magazine/${Date.now()}-${safeName}.pdf`, body, "application/pdf");
-        const issue = await createMagazineIssue({
-          title: title.trim(),
-          description: description.trim() || null,
-          pdfUrl: asset.url,
-          pdfStorageKey: asset.key,
-          coverImageUrl,
-          coverImageStorageKey
-        });
-        res.json(issue);
+        const safeId = uploadId.replace(/[^a-zA-Z0-9-]/g, "");
+        const asset = await storagePut(`magazine/_chunks/${safeId}/${String(index2).padStart(5, "0")}.part`, body, "application/octet-stream");
+        res.json({ key: asset.key });
       } catch (error) {
-        console.error("[Magazine upload] Failed", error);
-        res.status(500).json({ error: error instanceof Error ? error.message : "Falha ao publicar a edi\xE7\xE3o." });
+        console.error("[Magazine upload] Chunk failed", error);
+        res.status(500).json({ error: error instanceof Error ? error.message : "Falha ao enviar parte do ficheiro." });
       }
     }
   );
+  app2.post("/api/magazine/finalize", express.json(), async (req, res) => {
+    if (!await requireAdmin(req, res)) return;
+    const body = req.body;
+    const chunkKeys = Array.isArray(body.chunkKeys) ? body.chunkKeys.filter((key) => typeof key === "string") : [];
+    const title = typeof body.title === "string" ? body.title : "";
+    const fileName = typeof body.fileName === "string" ? body.fileName : "revista.pdf";
+    if (!chunkKeys.length) {
+      res.status(400).json({ error: "Partes do ficheiro em falta." });
+      return;
+    }
+    if (!title.trim()) {
+      res.status(400).json({ error: "T\xEDtulo em falta." });
+      return;
+    }
+    const description = typeof body.description === "string" ? body.description : "";
+    const coverImageUrl = typeof body.coverImageUrl === "string" ? body.coverImageUrl : null;
+    const coverImageStorageKey = typeof body.coverImageStorageKey === "string" ? body.coverImageStorageKey : null;
+    try {
+      const chunks = await Promise.all(chunkKeys.map((key) => storageFetchBytes(key)));
+      const fullFile = Buffer.concat(chunks);
+      const safeName = toEditorialSlug(fileName.replace(/\.pdf$/i, "")) || "revista";
+      const asset = await storagePut(`magazine/${Date.now()}-${safeName}.pdf`, fullFile, "application/pdf");
+      const issue = await createMagazineIssue({
+        title: title.trim(),
+        description: description.trim() || null,
+        pdfUrl: asset.url,
+        pdfStorageKey: asset.key,
+        coverImageUrl,
+        coverImageStorageKey
+      });
+      res.json(issue);
+    } catch (error) {
+      console.error("[Magazine upload] Finalize failed", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Falha ao publicar a edi\xE7\xE3o." });
+    }
+  });
 }
 
 // server/_core/oauth.ts
