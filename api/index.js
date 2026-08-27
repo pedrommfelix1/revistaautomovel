@@ -1,32 +1,10 @@
 // server/_core/vercel.ts
 import "dotenv/config";
-import express from "express";
+import express2 from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 
-// shared/const.ts
-var COOKIE_NAME = "app_session_id";
-var ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
-var AXIOS_TIMEOUT_MS = 3e4;
-var UNAUTHED_ERR_MSG = "Please login (10001)";
-var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
-var OAUTH_STATE_COOKIE = "__Host-oauth_state";
-var decodeOAuthState = (state) => {
-  let decoded;
-  try {
-    decoded = atob(state);
-  } catch {
-    return { redirectUri: "" };
-  }
-  try {
-    const parsed = JSON.parse(decoded);
-    if (parsed && typeof parsed.redirectUri === "string") return parsed;
-  } catch {
-  }
-  return { redirectUri: decoded };
-};
-
-// server/_core/oauth.ts
-import { parse as parseCookieHeader2 } from "cookie";
+// server/_core/magazineUpload.ts
+import express from "express";
 
 // server/db.ts
 import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
@@ -61,6 +39,8 @@ var categories = mysqlTable("categories", {
 var articles = mysqlTable("articles", {
   id: int("id").autoincrement().primaryKey(),
   title: varchar("title", { length: 220 }).notNull(),
+  /** Shown as the article's own H1 when set; falls back to `title` otherwise. Lets the destaque/notícias title differ from the headline used inside the article. */
+  articleTitle: varchar("articleTitle", { length: 220 }),
   slug: varchar("slug", { length: 180 }).notNull().unique(),
   deck: text("deck"),
   status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
@@ -112,6 +92,16 @@ var articleCategories = mysqlTable("articleCategories", {
   primaryKey({ columns: [table.articleId, table.categoryId] }),
   uniqueIndex("article_category_unique").on(table.articleId, table.categoryId)
 ]);
+var magazineIssues = mysqlTable("magazineIssues", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 220 }).notNull(),
+  description: text("description"),
+  pdfUrl: text("pdfUrl").notNull(),
+  pdfStorageKey: varchar("pdfStorageKey", { length: 600 }),
+  coverImageUrl: text("coverImageUrl"),
+  coverImageStorageKey: varchar("coverImageStorageKey", { length: 600 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull()
+});
 
 // server/_core/env.ts
 var ENV = {
@@ -294,6 +284,7 @@ async function updateArticleMetadata(input) {
   const db = await requireDb();
   await db.update(articles).set({
     title: input.title,
+    articleTitle: input.articleTitle,
     slug: input.slug,
     deck: input.deck,
     authorName: input.authorName,
@@ -368,24 +359,104 @@ async function replaceSiteGalleryImages(imageRows) {
     })));
   }
 }
+async function listMagazineIssues() {
+  const db = await requireDb();
+  return db.select().from(magazineIssues).orderBy(desc(magazineIssues.createdAt));
+}
+async function getMagazineIssue(id) {
+  const db = await requireDb();
+  const [issue] = await db.select().from(magazineIssues).where(eq(magazineIssues.id, id)).limit(1);
+  return issue ?? null;
+}
+async function createMagazineIssue(input) {
+  const db = await requireDb();
+  const [result] = await db.insert(magazineIssues).values(input).$returningId();
+  return getMagazineIssue(result.id);
+}
+async function deleteMagazineIssue(id) {
+  const db = await requireDb();
+  await db.delete(magazineIssues).where(eq(magazineIssues.id, id));
+}
 
-// server/_core/cookies.ts
-function isSecureRequest(req) {
-  if (req.protocol === "https") return true;
-  const forwardedProto = req.headers["x-forwarded-proto"];
-  if (!forwardedProto) return false;
-  const protoList = Array.isArray(forwardedProto) ? forwardedProto : forwardedProto.split(",");
-  return protoList.some((proto) => proto.trim().toLowerCase() === "https");
+// server/storage.ts
+function getForgeConfig() {
+  const forgeUrl = ENV.forgeApiUrl;
+  const forgeKey = ENV.forgeApiKey;
+  if (!forgeUrl || !forgeKey) {
+    throw new Error(
+      "Storage config missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
+    );
+  }
+  return { forgeUrl: forgeUrl.replace(/\/+$/, ""), forgeKey };
 }
-function getSessionCookieOptions(req) {
-  const secure = isSecureRequest(req);
-  return {
-    httpOnly: true,
-    path: "/",
-    sameSite: secure ? "none" : "lax",
-    secure
-  };
+function normalizeKey(relKey) {
+  return relKey.replace(/^\/+/, "");
 }
+function appendHashSuffix(relKey) {
+  const hash = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+  const lastDot = relKey.lastIndexOf(".");
+  if (lastDot === -1) return `${relKey}_${hash}`;
+  return `${relKey.slice(0, lastDot)}_${hash}${relKey.slice(lastDot)}`;
+}
+async function presignPut(relKey) {
+  const { forgeUrl, forgeKey } = getForgeConfig();
+  const key = appendHashSuffix(normalizeKey(relKey));
+  const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
+  presignUrl.searchParams.set("path", key);
+  const presignResp = await fetch(presignUrl, {
+    headers: { Authorization: `Bearer ${forgeKey}` }
+  });
+  if (!presignResp.ok) {
+    const msg = await presignResp.text().catch(() => presignResp.statusText);
+    throw new Error(`Storage presign failed (${presignResp.status}): ${msg}`);
+  }
+  const { url: uploadUrl } = await presignResp.json();
+  if (!uploadUrl) throw new Error("Forge returned empty presign URL");
+  return { key, uploadUrl };
+}
+async function storagePut(relKey, data, contentType = "application/octet-stream") {
+  const { key, uploadUrl: s3Url } = await presignPut(relKey);
+  const blob = typeof data === "string" ? new Blob([data], { type: contentType }) : new Blob([data], { type: contentType });
+  const uploadResp = await fetch(s3Url, {
+    method: "PUT",
+    headers: { "Content-Type": contentType },
+    body: blob
+  });
+  if (!uploadResp.ok) {
+    throw new Error(`Storage upload to S3 failed (${uploadResp.status})`);
+  }
+  return { key, url: `/manus-storage/${key}` };
+}
+
+// shared/editorial.ts
+function toEditorialSlug(value) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 170);
+}
+function canManageEditorialArticle(user, authorId) {
+  return user.role === "admin" || user.id === authorId;
+}
+
+// shared/const.ts
+var COOKIE_NAME = "app_session_id";
+var ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
+var AXIOS_TIMEOUT_MS = 3e4;
+var UNAUTHED_ERR_MSG = "Please login (10001)";
+var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
+var OAUTH_STATE_COOKIE = "__Host-oauth_state";
+var decodeOAuthState = (state) => {
+  let decoded;
+  try {
+    decoded = atob(state);
+  } catch {
+    return { redirectUri: "" };
+  }
+  try {
+    const parsed = JSON.parse(decoded);
+    if (parsed && typeof parsed.redirectUri === "string") return parsed;
+  } catch {
+  }
+  return { redirectUri: decoded };
+};
 
 // shared/_core/errors.ts
 var HttpError = class extends Error {
@@ -643,6 +714,77 @@ function buildCronUser(userInfo) {
   };
 }
 var sdk = new SDKServer();
+
+// server/_core/magazineUpload.ts
+function registerMagazineUploadRoute(app2) {
+  app2.post(
+    "/api/magazine/upload",
+    express.raw({ type: "application/pdf", limit: "300mb" }),
+    async (req, res) => {
+      try {
+        const user = await sdk.authenticateRequest(req);
+        if (user.role !== "admin") {
+          res.status(403).json({ error: "Apenas administradores podem publicar edi\xE7\xF5es." });
+          return;
+        }
+      } catch {
+        res.status(401).json({ error: "Sess\xE3o inv\xE1lida." });
+        return;
+      }
+      const body = req.body;
+      if (!Buffer.isBuffer(body) || body.length === 0) {
+        res.status(400).json({ error: "Ficheiro PDF em falta ou vazio." });
+        return;
+      }
+      const title = typeof req.query.title === "string" ? req.query.title : "";
+      const fileName = typeof req.query.fileName === "string" ? req.query.fileName : "revista.pdf";
+      if (!title.trim()) {
+        res.status(400).json({ error: "T\xEDtulo em falta." });
+        return;
+      }
+      const description = typeof req.query.description === "string" ? req.query.description : "";
+      const coverImageUrl = typeof req.query.coverImageUrl === "string" ? req.query.coverImageUrl : null;
+      const coverImageStorageKey = typeof req.query.coverImageStorageKey === "string" ? req.query.coverImageStorageKey : null;
+      try {
+        const safeName = toEditorialSlug(fileName.replace(/\.pdf$/i, "")) || "revista";
+        const asset = await storagePut(`magazine/${Date.now()}-${safeName}.pdf`, body, "application/pdf");
+        const issue = await createMagazineIssue({
+          title: title.trim(),
+          description: description.trim() || null,
+          pdfUrl: asset.url,
+          pdfStorageKey: asset.key,
+          coverImageUrl,
+          coverImageStorageKey
+        });
+        res.json(issue);
+      } catch (error) {
+        console.error("[Magazine upload] Failed", error);
+        res.status(500).json({ error: error instanceof Error ? error.message : "Falha ao publicar a edi\xE7\xE3o." });
+      }
+    }
+  );
+}
+
+// server/_core/oauth.ts
+import { parse as parseCookieHeader2 } from "cookie";
+
+// server/_core/cookies.ts
+function isSecureRequest(req) {
+  if (req.protocol === "https") return true;
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  if (!forwardedProto) return false;
+  const protoList = Array.isArray(forwardedProto) ? forwardedProto : forwardedProto.split(",");
+  return protoList.some((proto) => proto.trim().toLowerCase() === "https");
+}
+function getSessionCookieOptions(req) {
+  const secure = isSecureRequest(req);
+  return {
+    httpOnly: true,
+    path: "/",
+    sameSite: secure ? "none" : "lax",
+    secure
+  };
+}
 
 // server/_core/oauth.ts
 function getQueryParam(req, key) {
@@ -932,62 +1074,6 @@ var systemRouter = router({
 // server/routers/editorial.ts
 import { TRPCError as TRPCError3 } from "@trpc/server";
 import { z as z2 } from "zod";
-
-// server/storage.ts
-function getForgeConfig() {
-  const forgeUrl = ENV.forgeApiUrl;
-  const forgeKey = ENV.forgeApiKey;
-  if (!forgeUrl || !forgeKey) {
-    throw new Error(
-      "Storage config missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
-    );
-  }
-  return { forgeUrl: forgeUrl.replace(/\/+$/, ""), forgeKey };
-}
-function normalizeKey(relKey) {
-  return relKey.replace(/^\/+/, "");
-}
-function appendHashSuffix(relKey) {
-  const hash = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
-  const lastDot = relKey.lastIndexOf(".");
-  if (lastDot === -1) return `${relKey}_${hash}`;
-  return `${relKey.slice(0, lastDot)}_${hash}${relKey.slice(lastDot)}`;
-}
-async function storagePut(relKey, data, contentType = "application/octet-stream") {
-  const { forgeUrl, forgeKey } = getForgeConfig();
-  const key = appendHashSuffix(normalizeKey(relKey));
-  const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
-  presignUrl.searchParams.set("path", key);
-  const presignResp = await fetch(presignUrl, {
-    headers: { Authorization: `Bearer ${forgeKey}` }
-  });
-  if (!presignResp.ok) {
-    const msg = await presignResp.text().catch(() => presignResp.statusText);
-    throw new Error(`Storage presign failed (${presignResp.status}): ${msg}`);
-  }
-  const { url: s3Url } = await presignResp.json();
-  if (!s3Url) throw new Error("Forge returned empty presign URL");
-  const blob = typeof data === "string" ? new Blob([data], { type: contentType }) : new Blob([data], { type: contentType });
-  const uploadResp = await fetch(s3Url, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: blob
-  });
-  if (!uploadResp.ok) {
-    throw new Error(`Storage upload to S3 failed (${uploadResp.status})`);
-  }
-  return { key, url: `/manus-storage/${key}` };
-}
-
-// shared/editorial.ts
-function toEditorialSlug(value) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 170);
-}
-function canManageEditorialArticle(user, authorId) {
-  return user.role === "admin" || user.id === authorId;
-}
-
-// server/routers/editorial.ts
 var sectionInput = z2.object({
   type: z2.enum(["paragraph", "chapter", "quote"]),
   heading: z2.string().max(220).nullable().optional(),
@@ -1005,6 +1091,7 @@ var imageInput = z2.object({
 var metadataInput = z2.object({
   id: z2.number().int().positive(),
   title: z2.string().min(3).max(220),
+  articleTitle: z2.string().max(220).nullable(),
   slug: z2.string().min(3).max(180),
   deck: z2.string().max(700).nullable(),
   authorName: z2.string().min(2).max(120),
@@ -1162,6 +1249,43 @@ var galleryRouter = router({
   })
 });
 
+// server/routers/magazine.ts
+import { TRPCError as TRPCError5 } from "@trpc/server";
+import { z as z4 } from "zod";
+function assertCanManageMagazine(ctx) {
+  if (ctx.user.role !== "admin") {
+    throw new TRPCError5({ code: "FORBIDDEN", message: "Apenas administradores podem gerir a revista." });
+  }
+}
+var magazineRouter = router({
+  list: publicProcedure.query(() => listMagazineIssues()),
+  byId: publicProcedure.input(z4.object({ id: z4.number().int().positive() })).query(({ input }) => getMagazineIssue(input.id)),
+  manage: router({
+    // The PDF itself is uploaded via a plain POST to /api/magazine/upload
+    // (see server/_core/magazineUpload.ts), not through tRPC — it can easily
+    // be 50MB+, well past what a JSON/base64 body should carry.
+    uploadCover: protectedProcedure.input(z4.object({ dataUrl: z4.string().min(32).max(4e6), fileName: z4.string().min(1).max(180) })).mutation(async ({ ctx, input }) => {
+      assertCanManageMagazine(ctx);
+      const match = input.dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+      if (!match) {
+        throw new TRPCError5({ code: "BAD_REQUEST", message: "Capa inv\xE1lida \u2014 tem de ser gerada a partir da primeira p\xE1gina do PDF." });
+      }
+      const contentType = match[1];
+      const bytes = Buffer.from(match[2], "base64");
+      if (bytes.byteLength > 3e6) {
+        throw new TRPCError5({ code: "PAYLOAD_TOO_LARGE", message: "A capa gerada excede o tamanho m\xE1ximo permitido." });
+      }
+      const ext = contentType === "image/png" ? "png" : contentType === "image/webp" ? "webp" : "jpg";
+      return storagePut(`magazine/covers/${Date.now()}-${toEditorialSlug(input.fileName) || "capa"}.${ext}`, bytes, contentType);
+    }),
+    delete: protectedProcedure.input(z4.object({ id: z4.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      assertCanManageMagazine(ctx);
+      await deleteMagazineIssue(input.id);
+      return { success: true, id: input.id };
+    })
+  })
+});
+
 // server/routers.ts
 var appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -1177,7 +1301,8 @@ var appRouter = router({
     })
   }),
   editorial: editorialRouter,
-  gallery: galleryRouter
+  gallery: galleryRouter,
+  magazine: magazineRouter
 });
 
 // server/_core/context.ts
@@ -1196,14 +1321,15 @@ async function createContext(opts) {
 }
 
 // server/_core/vercel.ts
-var app = express();
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+var app = express2();
+app.use(express2.json({ limit: "50mb" }));
+app.use(express2.urlencoded({ limit: "50mb", extended: true }));
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, hasDatabaseUrl: Boolean(process.env.DATABASE_URL), nodeEnv: process.env.NODE_ENV ?? null });
 });
 registerStorageProxy(app);
 registerOAuthRoutes(app);
+registerMagazineUploadRoute(app);
 app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 app.use((err, _req, res, _next) => {
   console.error("[api] unhandled error:", err);

@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { articleCategories, articleImages, articles, articleSections, categories, InsertUser, siteGalleryImages, users } from "../drizzle/schema";
+import { articleCategories, articleImages, articles, articleSections, categories, InsertUser, magazineIssues, siteGalleryImages, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -232,10 +232,11 @@ export async function createArticle(input: { title: string; slug: string; author
   return created ? getArticleWithContent(created.id) : null;
 }
 
-export async function updateArticleMetadata(input: { id: number; title: string; slug: string; deck: string | null; authorName: string; coverImageUrl: string | null; coverImageCaption: string | null; seoTitle: string | null; seoDescription: string | null; socialImageUrl: string | null; isFeatured: boolean }) {
+export async function updateArticleMetadata(input: { id: number; title: string; articleTitle: string | null; slug: string; deck: string | null; authorName: string; coverImageUrl: string | null; coverImageCaption: string | null; seoTitle: string | null; seoDescription: string | null; socialImageUrl: string | null; isFeatured: boolean }) {
   const db = await requireDb();
   await db.update(articles).set({
     title: input.title,
+    articleTitle: input.articleTitle,
     slug: input.slug,
     deck: input.deck,
     authorName: input.authorName,
@@ -316,4 +317,33 @@ export async function replaceSiteGalleryImages(imageRows: ImageInput[]) {
       position: image.position,
     })));
   }
+}
+
+export async function listMagazineIssues() {
+  const db = await requireDb();
+  return db.select().from(magazineIssues).orderBy(desc(magazineIssues.createdAt));
+}
+
+export async function getMagazineIssue(id: number) {
+  const db = await requireDb();
+  const [issue] = await db.select().from(magazineIssues).where(eq(magazineIssues.id, id)).limit(1);
+  return issue ?? null;
+}
+
+export async function createMagazineIssue(input: {
+  title: string;
+  description: string | null;
+  pdfUrl: string;
+  pdfStorageKey: string | null;
+  coverImageUrl: string | null;
+  coverImageStorageKey: string | null;
+}) {
+  const db = await requireDb();
+  const [result] = await db.insert(magazineIssues).values(input).$returningId();
+  return getMagazineIssue(result.id);
+}
+
+export async function deleteMagazineIssue(id: number) {
+  const db = await requireDb();
+  await db.delete(magazineIssues).where(eq(magazineIssues.id, id));
 }

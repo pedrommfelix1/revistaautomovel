@@ -37,6 +37,8 @@ export const categories = mysqlTable("categories", {
 export const articles = mysqlTable("articles", {
   id: int("id").autoincrement().primaryKey(),
   title: varchar("title", { length: 220 }).notNull(),
+  /** Shown as the article's own H1 when set; falls back to `title` otherwise. Lets the destaque/notícias title differ from the headline used inside the article. */
+  articleTitle: varchar("articleTitle", { length: 220 }),
   slug: varchar("slug", { length: 180 }).notNull().unique(),
   deck: text("deck"),
   status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
@@ -93,5 +95,17 @@ export const articleCategories = mysqlTable("articleCategories", {
   uniqueIndex("article_category_unique").on(table.articleId, table.categoryId),
 ]);
 
+export const magazineIssues = mysqlTable("magazineIssues", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 220 }).notNull(),
+  description: text("description"),
+  pdfUrl: text("pdfUrl").notNull(),
+  pdfStorageKey: varchar("pdfStorageKey", { length: 600 }),
+  coverImageUrl: text("coverImageUrl"),
+  coverImageStorageKey: varchar("coverImageStorageKey", { length: 600 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export type Category = typeof categories.$inferSelect;
 export type Article = typeof articles.$inferSelect;
+export type MagazineIssue = typeof magazineIssues.$inferSelect;

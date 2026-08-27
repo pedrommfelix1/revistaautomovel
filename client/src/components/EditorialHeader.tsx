@@ -5,6 +5,7 @@ import { Link } from "wouter";
 const mainTabs = [
   { label: "Notícias", href: "/noticias" },
   { label: "Multimédia", href: "/multimedia" },
+  { label: "Revista", href: "/revista" },
   { label: "Sobre", href: "/sobre" },
 ];
 
@@ -49,7 +50,7 @@ export function EditorialHeader() {
                 <span className="font-mono text-[10px] text-[#f0372f]">0{index + 1}</span>{tab.label}
               </Link>
             ))}
-            <Link onClick={() => setOpen(false)} href="/redacao" className="mobile-nav-link"><span className="font-mono text-[10px] text-[#f0372f]">04</span>Redação</Link>
+            <Link onClick={() => setOpen(false)} href="/redacao" className="mobile-nav-link"><span className="font-mono text-[10px] text-[#f0372f]">0{mainTabs.length + 1}</span>Redação</Link>
           </div>
         </nav>
       )}

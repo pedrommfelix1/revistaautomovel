@@ -100,6 +100,7 @@ describe("editorial publication router", () => {
     await caller.editorial.manage.saveMetadata({
       id: 7,
       title: "Título editorial",
+      articleTitle: null,
       slug: "titulo-editorial",
       deck: "Subtítulo",
       authorName: "Autor de teste",
@@ -135,6 +136,7 @@ describe("editorial publication router", () => {
     await expect(caller.editorial.manage.saveMetadata({
       id: 7,
       title: "Título ocupado",
+      articleTitle: null,
       slug: "titulo-ocupado",
       deck: null,
       authorName: "Autor de teste",

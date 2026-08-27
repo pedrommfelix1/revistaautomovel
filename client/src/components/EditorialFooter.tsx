@@ -12,6 +12,7 @@ export function EditorialFooter() {
           <Link href="/" className="footer-link">Início</Link>
           <Link href="/noticias" className="footer-link">Notícias</Link>
           <Link href="/multimedia" className="footer-link">Multimédia</Link>
+          <Link href="/revista" className="footer-link">Revista</Link>
           <Link href="/sobre" className="footer-link">Sobre</Link>
           <Link href="/redacao" className="footer-link">Redação</Link>
         </div>

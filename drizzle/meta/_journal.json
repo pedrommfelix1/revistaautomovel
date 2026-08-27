@@ -36,6 +36,20 @@
       "when": 1787834220388,
       "tag": "0004_gifted_rattler",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1787840397562,
+      "tag": "0005_soft_pride",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787842112119,
+      "tag": "0006_ambiguous_ogun",
+      "breakpoints": true
     }
   ]
 }

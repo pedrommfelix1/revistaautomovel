@@ -44,6 +44,7 @@ const imageInput = z.object({
 const metadataInput = z.object({
   id: z.number().int().positive(),
   title: z.string().min(3).max(220),
+  articleTitle: z.string().max(220).nullable(),
   slug: z.string().min(3).max(180),
   deck: z.string().max(700).nullable(),
   authorName: z.string().min(2).max(120),

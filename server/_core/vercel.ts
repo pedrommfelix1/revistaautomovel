@@ -2,6 +2,7 @@ import "dotenv/config";
 import express, { type NextFunction, type Request, type Response } from "express";
 import type { IncomingMessage, ServerResponse } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import { registerMagazineUploadRoute } from "./magazineUpload";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
@@ -35,6 +36,7 @@ app.get("/api/health", (_req, res) => {
 
 registerStorageProxy(app);
 registerOAuthRoutes(app);
+registerMagazineUploadRoute(app);
 app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 
 // Surface unexpected errors as JSON instead of letting the function crash silently.

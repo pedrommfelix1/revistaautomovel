@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { FilePenLine, House, Images, LogOut, PanelLeft } from "lucide-react";
+import { BookOpen, FilePenLine, House, Images, LogOut, PanelLeft } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -30,6 +30,7 @@ import { Button } from "./ui/button";
 const menuItems = [
   { icon: FilePenLine, label: "Artigos", path: "/redacao" },
   { icon: Images, label: "Multimédia", path: "/redacao/multimedia" },
+  { icon: BookOpen, label: "Revista", path: "/redacao/revista" },
   { icon: House, label: "Ver site", path: "/" },
 ];
 
