@@ -12,14 +12,19 @@ import { createContext } from "./context";
 // and the .listen() call, since Vercel invokes this handler per-request and
 // serves the built client separately via its static output.
 //
-// This file is pre-bundled by esbuild into api/index.js (see the "vercel-build"
-// script in package.json / vercel.json's buildCommand) rather than deployed as
-// raw TypeScript. Vercel's own TS-to-JS compilation for /api files is per-file,
-// not a full bundle, and its output is loaded by Node's native ESM resolver —
-// which requires explicit file extensions on relative imports and fails on
-// ordinary extensionless TS-style imports like "./oauth". Bundling ahead of
-// time inlines all local modules into one file, leaving only real node_modules
-// imports (which Node/Vercel can resolve normally) for the deployed function.
+// This file is pre-bundled by esbuild into api/index.js ("pnpm build:api",
+// also re-run by vercel.json's buildCommand on every deploy) rather than
+// deployed as raw TypeScript. Two reasons that has to be a real bundle:
+//  1. Vercel's own TS-to-JS compilation for /api files is per-file, not a
+//     full bundle, and the output runs under Node's native ESM resolver,
+//     which requires explicit file extensions on relative imports and fails
+//     on ordinary extensionless TS-style imports like "./oauth".
+//  2. Vercel decides which files under api/ become serverless functions by
+//     scanning the git-committed source, before any buildCommand runs — so
+//     api/index.js must be committed (not gitignored), or Vercel never
+//     creates the function at all (404 instead of a crash).
+// If you change this file or anything it imports, run `pnpm build:api` and
+// commit the resulting api/index.js before pushing.
 const app = express();
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
