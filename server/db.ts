@@ -155,7 +155,7 @@ export async function getArticleWithContent(id: number) {
       .from(articleCategories)
       .innerJoin(categories, eq(articleCategories.categoryId, categories.id))
       .where(eq(articleCategories.articleId, id))
-      .orderBy(asc(categories.name)),
+      .orderBy(sql`CASE WHEN ${categories.kind} = 'marca' THEN 0 ELSE 1 END`, asc(categories.name)),
   ]);
 
   return { ...article, sections: sectionRows, images: imageRows, categories: categoryRows };

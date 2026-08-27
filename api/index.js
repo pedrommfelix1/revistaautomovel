@@ -235,7 +235,7 @@ async function getArticleWithContent(id) {
   const [sectionRows, imageRows, categoryRows] = await Promise.all([
     db.select().from(articleSections).where(eq(articleSections.articleId, id)).orderBy(asc(articleSections.position)),
     db.select().from(articleImages).where(eq(articleImages.articleId, id)).orderBy(asc(articleImages.position)),
-    db.select({ id: categories.id, name: categories.name, slug: categories.slug, description: categories.description, kind: categories.kind }).from(articleCategories).innerJoin(categories, eq(articleCategories.categoryId, categories.id)).where(eq(articleCategories.articleId, id)).orderBy(asc(categories.name))
+    db.select({ id: categories.id, name: categories.name, slug: categories.slug, description: categories.description, kind: categories.kind }).from(articleCategories).innerJoin(categories, eq(articleCategories.categoryId, categories.id)).where(eq(articleCategories.articleId, id)).orderBy(sql`CASE WHEN ${categories.kind} = 'marca' THEN 0 ELSE 1 END`, asc(categories.name))
   ]);
   return { ...article, sections: sectionRows, images: imageRows, categories: categoryRows };
 }

@@ -30,7 +30,7 @@ export function ArticleCard({ article, featured = false, index = 0 }: { article:
       </Link>
       <div className={`flex flex-1 flex-col ${featured ? "pt-5" : "border-t border-black pt-4"}`}>
         <div className="mb-3 flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-[0.13em]">
-          <span className="text-[#f0372f]">{article.categories[0]?.name ?? "Editorial"}</span>
+          <span className="text-[#f0372f]">{article.categories.map((category) => category.name).join(" / ") || "Editorial"}</span>
           <span className="font-mono font-normal text-neutral-500">{String(index + 1).padStart(2, "0")}</span>
         </div>
         <Link href={`/artigo/${article.slug}`} className="group/title no-underline text-black">
