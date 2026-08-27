@@ -22,7 +22,7 @@ export default function Home() {
         </section>
 
         <section className="editorial-shell">
-          <div className="mb-7 flex items-center justify-between gap-4"><h2 className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.14em]"><span className="h-3 w-3 bg-[#f0372f]" /> Em destaque</h2><span className="font-mono text-[10px] text-neutral-500">01 — Seleção editorial</span></div>
+          <div className="mb-7 flex items-center gap-4"><h2 className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.14em]"><span className="h-3 w-3 bg-[#f0372f]" /> Em destaque</h2></div>
           {featuredLoading ? <div className="aspect-[16/8] animate-pulse bg-neutral-100" /> : lead ? <ArticleCard article={lead} featured /> : <div className="border-y-2 border-black py-14"><p className="text-3xl font-black tracking-[-0.06em]">A próxima história começa na redação.</p><Link href="/redacao" className="mt-7 inline-flex items-center gap-2 border-b-2 border-black pb-1 text-xs font-bold uppercase tracking-[0.12em]">Abrir redação <ArrowRight size={15} /></Link></div>}
         </section>
 

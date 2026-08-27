@@ -24,11 +24,32 @@ function splitParagraphs(body: string): string[] {
   return body.split(/\n+/).map((paragraph) => paragraph.trim()).filter(Boolean);
 }
 
+function useRecentArticles(excludeId: number) {
+  const { data: recent = [] } = trpc.editorial.latest.useQuery({ limit: 6 });
+  return recent.filter((item) => item.id !== excludeId).slice(0, 5);
+}
+
+function RecentArticlesList({ items }: { items: { id: number; slug: string; title: string }[] }) {
+  if (!items.length) return null;
+  return (
+    <div>
+      <h2 className="article-sidebar-heading">Artigos recentes</h2>
+      <ol className="article-recent-list">
+        {items.map((item, index) => (
+          <li key={item.id} className="article-recent-item">
+            <span className="article-recent-index">{index + 1}</span>
+            <Link href={`/artigo/${item.slug}`} className="article-recent-title no-underline">{item.title}</Link>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 function ArticleSidebar({ article }: { article: ArticleData }) {
   const [, setLocation] = useLocation();
   const [query, setQuery] = useState("");
-  const { data: recent = [] } = trpc.editorial.latest.useQuery({ limit: 6 });
-  const items = recent.filter((item) => item.id !== article.id).slice(0, 5);
+  const items = useRecentArticles(article.id);
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,7 +61,7 @@ function ArticleSidebar({ article }: { article: ArticleData }) {
     <aside className="article-sidebar">
       {article.coverImageUrl && (
         <figure className="article-cover-area">
-          <img src={article.coverImageUrl} alt="" className="aspect-[4/3] w-full object-cover" />
+          <img src={article.coverImageUrl} alt="" className="aspect-square w-full object-cover" />
           {article.coverImageCaption && <figcaption>{article.coverImageCaption}</figcaption>}
         </figure>
       )}
@@ -51,21 +72,23 @@ function ArticleSidebar({ article }: { article: ArticleData }) {
           <button type="submit" aria-label="Pesquisar" className="flex w-10 shrink-0 items-center justify-center bg-black text-white transition-colors hover:bg-[#f0372f]"><Search size={16} /></button>
         </form>
 
-        {items.length > 0 && (
-          <div className="mt-9">
-            <h2 className="article-sidebar-heading">Artigos recentes</h2>
-            <ol className="article-recent-list">
-              {items.map((item, index) => (
-                <li key={item.id} className="article-recent-item">
-                  <span className="article-recent-index">{index + 1}</span>
-                  <Link href={`/artigo/${item.slug}`} className="article-recent-title no-underline">{item.title}</Link>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
+        {/* On mobile "Artigos recentes" moves to the bottom of the page (see ArticleRecentMobile);
+            only the sticky desktop rail shows it bundled with the photo and search. */}
+        <div className="mt-9 hidden lg:block">
+          <RecentArticlesList items={items} />
+        </div>
       </div>
     </aside>
+  );
+}
+
+function ArticleRecentMobile({ article }: { article: ArticleData }) {
+  const items = useRecentArticles(article.id);
+  if (!items.length) return null;
+  return (
+    <div className="editorial-shell mt-16 border-t-2 border-black pt-7 lg:hidden">
+      <RecentArticlesList items={items} />
+    </div>
   );
 }
 
@@ -125,6 +148,7 @@ export default function Article() {
         </div>
 
         <div className="article-gallery-wrap"><PhotoGallery images={article.images} /></div>
+        <ArticleRecentMobile article={article} />
       </main>
       <EditorialFooter />
     </div>

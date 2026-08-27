@@ -7,14 +7,18 @@ import { useMemo, useState } from "react";
 export default function News() {
   const { data: categories = [] } = trpc.editorial.categories.useQuery();
   const { data: articles = [], isLoading } = trpc.editorial.all.useQuery();
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeTipo, setActiveTipo] = useState<string | null>(null);
+  const [activeMarca, setActiveMarca] = useState<string | null>(null);
   const tipos = categories.filter((category) => category.kind === "tipo");
   const marcas = categories.filter((category) => category.kind === "marca");
 
   const filtered = useMemo(() => {
-    if (!activeCategory) return articles;
-    return articles.filter((article) => article.categories.some((category) => category.slug === activeCategory));
-  }, [articles, activeCategory]);
+    return articles.filter((article) => {
+      const matchesTipo = !activeTipo || article.categories.some((category) => category.slug === activeTipo);
+      const matchesMarca = !activeMarca || article.categories.some((category) => category.slug === activeMarca);
+      return matchesTipo && matchesMarca;
+    });
+  }, [articles, activeTipo, activeMarca]);
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
@@ -25,26 +29,31 @@ export default function News() {
         <p className="mt-4 max-w-xl text-sm leading-relaxed text-neutral-600">Todas as histórias publicadas no Motor de Linha, por ordem de publicação.</p>
 
         {categories.length > 0 && (
-          <div className="mt-8 space-y-4 border-t border-black pt-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <button onClick={() => setActiveCategory(null)} className={`border px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.1em] transition-colors ${activeCategory === null ? "border-black bg-black text-white" : "border-black text-black hover:bg-black hover:text-white"}`}>Todas</button>
+          <div className="mt-8 grid gap-4 border-t border-black pt-5 sm:grid-cols-2 sm:max-w-lg">
+            <div>
+              <label htmlFor="tipo-filter" className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-neutral-500">Tipo de carro</label>
+              <select
+                id="tipo-filter"
+                value={activeTipo ?? ""}
+                onChange={(event) => setActiveTipo(event.target.value || null)}
+                className="w-full border-2 border-black bg-white px-3 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.1em] outline-none"
+              >
+                <option value="">Todos</option>
+                {tipos.map((category) => <option key={category.id} value={category.slug}>{category.name}</option>)}
+              </select>
             </div>
-            {tipos.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-neutral-500">Tipo:</span>
-                {tipos.map((category) => (
-                  <button key={category.id} onClick={() => setActiveCategory(category.slug)} className={`border px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.1em] transition-colors ${activeCategory === category.slug ? "border-black bg-black text-white" : "border-black text-black hover:bg-black hover:text-white"}`}>{category.name}</button>
-                ))}
-              </div>
-            )}
-            {marcas.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-neutral-500">Marca:</span>
-                {marcas.map((category) => (
-                  <button key={category.id} onClick={() => setActiveCategory(category.slug)} className={`border px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.1em] transition-colors ${activeCategory === category.slug ? "border-black bg-black text-white" : "border-black text-black hover:bg-black hover:text-white"}`}>{category.name}</button>
-                ))}
-              </div>
-            )}
+            <div>
+              <label htmlFor="marca-filter" className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-neutral-500">Marca</label>
+              <select
+                id="marca-filter"
+                value={activeMarca ?? ""}
+                onChange={(event) => setActiveMarca(event.target.value || null)}
+                className="w-full border-2 border-black bg-white px-3 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.1em] outline-none"
+              >
+                <option value="">Todas</option>
+                {marcas.map((category) => <option key={category.id} value={category.slug}>{category.name}</option>)}
+              </select>
+            </div>
           </div>
         )}
 

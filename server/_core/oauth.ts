@@ -95,4 +95,41 @@ export function registerOAuthRoutes(app: Express) {
       }
     });
   }
+
+  // Manual admin entry point for deployments (e.g. Vercel) where the real
+  // Manus OAuth redirect URI isn't registered. Only works when ADMIN_ACCESS_TOKEN
+  // is set and the caller supplies the exact same value as ?token= — without
+  // that env var configured, this route always rejects, so it's inert unless
+  // the owner deliberately opts in.
+  app.get("/api/admin-login", async (req: Request, res: Response) => {
+    const token = getQueryParam(req, "token");
+    if (!ENV.adminAccessToken || !token || token !== ENV.adminAccessToken) {
+      res.status(403).send("Forbidden");
+      return;
+    }
+    if (!ENV.ownerOpenId) {
+      res.status(500).json({ error: "OWNER_OPEN_ID not configured" });
+      return;
+    }
+
+    try {
+      await db.upsertUser({
+        openId: ENV.ownerOpenId,
+        name: "Pedro Félix",
+        lastSignedIn: new Date(),
+      });
+
+      const sessionToken = await sdk.createSessionToken(ENV.ownerOpenId, {
+        name: "Pedro Félix",
+        expiresInMs: ONE_YEAR_MS,
+      });
+
+      const cookieOptions = getSessionCookieOptions(req);
+      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      res.redirect(302, "/redacao");
+    } catch (error) {
+      console.error("[Admin login] Failed", error);
+      res.status(500).json({ error: "Admin login failed" });
+    }
+  });
 }
