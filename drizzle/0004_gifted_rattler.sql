@@ -1,0 +1,1 @@
+ALTER TABLE `categories` ADD `kind` enum('tipo','marca') DEFAULT 'tipo' NOT NULL;

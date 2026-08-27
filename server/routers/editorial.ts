@@ -38,7 +38,7 @@ const imageInput = z.object({
   storageKey: z.string().max(600).nullable().optional(),
   altText: z.string().max(250).nullable().optional(),
   caption: z.string().max(600).nullable().optional(),
-  position: z.number().int().min(0).max(2),
+  position: z.number().int().min(0).max(9),
 });
 
 const metadataInput = z.object({
@@ -119,7 +119,7 @@ export const editorialRouter = router({
       await replaceArticleSections(input.id, input.sections);
       return getArticleWithContent(input.id);
     }),
-    saveImages: protectedProcedure.input(z.object({ id: z.number().int().positive(), images: z.array(imageInput).max(3) })).mutation(async ({ ctx, input }) => {
+    saveImages: protectedProcedure.input(z.object({ id: z.number().int().positive(), images: z.array(imageInput).max(10) })).mutation(async ({ ctx, input }) => {
       await assertCanManageArticle(ctx, input.id);
       await replaceArticleImages(input.id, input.images);
       return getArticleWithContent(input.id);
@@ -142,12 +142,12 @@ export const editorialRouter = router({
       await deleteArticle(input.id);
       return { success: true as const, id: input.id };
     }),
-    createCategory: protectedProcedure.input(z.object({ name: z.string().min(2).max(80), description: z.string().max(240).nullable().optional() })).mutation(async ({ ctx, input }) => {
+    createCategory: protectedProcedure.input(z.object({ name: z.string().min(2).max(80), description: z.string().max(240).nullable().optional(), kind: z.enum(["tipo", "marca"]) })).mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") {
         throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem criar categorias." });
       }
       const slug = toEditorialSlug(input.name);
-      return createCategory({ name: input.name, slug, description: input.description ?? null });
+      return createCategory({ name: input.name, slug, description: input.description ?? null, kind: input.kind });
     }),
     uploadImage: protectedProcedure.input(z.object({ id: z.number().int().positive(), dataUrl: z.string().min(32).max(8_000_000), fileName: z.string().min(1).max(180) })).mutation(async ({ ctx, input }) => {
       await assertCanManageArticle(ctx, input.id);

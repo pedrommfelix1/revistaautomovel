@@ -5,7 +5,7 @@ import { Link } from "wouter";
 const mainTabs = [
   { label: "Notícias", href: "/noticias" },
   { label: "Multimédia", href: "/multimedia" },
-  { label: "Contactos", href: "/contactos" },
+  { label: "Sobre", href: "/sobre" },
 ];
 
 export function EditorialHeader() {

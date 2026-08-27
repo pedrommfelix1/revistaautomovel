@@ -42,3 +42,4 @@
 - [x] Criar a página Notícias com todos os artigos publicados e filtro por categoria.
 - [x] Renomear a galeria do site para Multimédia (rotas `/multimedia` e `/redacao/multimedia`).
 - [x] Criar a página Contactos com informação de contacto placeholder.
+- [x] Aumentar o limite da galeria embutida no artigo de 3 para 10 imagens de destaque.

@@ -116,7 +116,7 @@ export async function listCategories() {
   return db.select().from(categories).orderBy(asc(categories.name));
 }
 
-export async function createCategory(input: { name: string; slug: string; description: string | null }) {
+export async function createCategory(input: { name: string; slug: string; description: string | null; kind: "tipo" | "marca" }) {
   const db = await requireDb();
   await db.insert(categories).values(input);
   const [created] = await db.select().from(categories).where(eq(categories.slug, input.slug)).limit(1);
@@ -151,7 +151,7 @@ export async function getArticleWithContent(id: number) {
   const [sectionRows, imageRows, categoryRows] = await Promise.all([
     db.select().from(articleSections).where(eq(articleSections.articleId, id)).orderBy(asc(articleSections.position)),
     db.select().from(articleImages).where(eq(articleImages.articleId, id)).orderBy(asc(articleImages.position)),
-    db.select({ id: categories.id, name: categories.name, slug: categories.slug, description: categories.description })
+    db.select({ id: categories.id, name: categories.name, slug: categories.slug, description: categories.description, kind: categories.kind })
       .from(articleCategories)
       .innerJoin(categories, eq(articleCategories.categoryId, categories.id))
       .where(eq(articleCategories.articleId, id))

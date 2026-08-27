@@ -30,6 +30,7 @@ export const categories = mysqlTable("categories", {
   name: varchar("name", { length: 80 }).notNull(),
   slug: varchar("slug", { length: 100 }).notNull().unique(),
   description: text("description"),
+  kind: mysqlEnum("kind", ["tipo", "marca"]).default("tipo").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

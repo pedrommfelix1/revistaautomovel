@@ -7,9 +7,9 @@ export default function Gallery() {
   const { data: images = [], isLoading } = trpc.gallery.list.useQuery();
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="flex min-h-screen flex-col bg-white">
       <EditorialHeader />
-      <main className="editorial-shell py-11 sm:py-16">
+      <main className="editorial-shell flex-1 py-11 sm:py-16">
         <p className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[#f0372f]"><span className="h-3 w-3 bg-[#f0372f]" /> Arquivo visual</p>
         <h1 className="max-w-2xl text-4xl font-black tracking-[-0.07em] sm:text-5xl">Multimédia</h1>
         <p className="mt-4 max-w-xl text-sm leading-relaxed text-neutral-600">Um arquivo fotográfico do Motor de Linha, independente dos artigos — até cem imagens editoriais.</p>

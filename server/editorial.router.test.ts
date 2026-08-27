@@ -186,19 +186,19 @@ describe("editorial publication router", () => {
     expect(editorialDb.replaceArticleSections).toHaveBeenCalledWith(7, sections);
   });
 
-  it("rejects saving more than 3 images in an article's embedded gallery", async () => {
+  it("rejects saving more than 10 images in an article's embedded gallery", async () => {
     const caller = appRouter.createCaller(createContext(12, "user"));
-    const images = [0, 1, 2, 3].map((position) => ({ url: `/manus-storage/${position}.jpg`, position }));
+    const images = Array.from({ length: 11 }, (_, position) => ({ url: `/manus-storage/${position}.jpg`, position: Math.min(position, 9) }));
 
     await expect(caller.editorial.manage.saveImages({ id: 7, images })).rejects.toThrow();
     expect(editorialDb.replaceArticleImages).not.toHaveBeenCalled();
   });
 
-  it("saves up to 3 images in an article's embedded gallery", async () => {
+  it("saves up to 10 images in an article's embedded gallery", async () => {
     editorialDb.findArticleById.mockResolvedValue({ id: 7, authorId: 12 });
     editorialDb.getArticleWithContent.mockResolvedValue({ id: 7, images: [] });
     const caller = appRouter.createCaller(createContext(12, "user"));
-    const images = [0, 1, 2].map((position) => ({ url: `/manus-storage/${position}.jpg`, position }));
+    const images = Array.from({ length: 10 }, (_, position) => ({ url: `/manus-storage/${position}.jpg`, position }));
 
     await caller.editorial.manage.saveImages({ id: 7, images });
 

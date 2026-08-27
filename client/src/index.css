@@ -186,10 +186,17 @@
   .home-masthead { display: grid; gap: 2.5rem; }
   .article-title-area h1 { max-width: 900px; font-size: clamp(3.35rem, 8vw, 8.4rem); font-weight: 700; line-height: 0.82; letter-spacing: -0.095em; overflow-wrap: anywhere; word-break: break-word; }
   .article-deck { max-width: 47rem; margin-top: 1.8rem; font-size: clamp(1.15rem, 2vw, 1.45rem); line-height: 1.42; color: #555; overflow-wrap: anywhere; word-break: break-word; }
-  .article-layout { width: min(100% - 2.5rem, 1400px); margin: 5.5rem auto 0; display: grid; grid-template-columns: minmax(0, 1fr); }
-  .article-margin-note { display: none; }
-  .article-copy { max-width: 720px; min-width: 0; }
+  .article-layout { width: min(100% - 2.5rem, 1400px); margin: 2rem auto 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3rem; }
+  .article-copy { min-width: 0; }
   .article-copy p { font-size: clamp(1.16rem, 2.05vw, 1.43rem); line-height: 1.7; letter-spacing: -0.02em; overflow-wrap: anywhere; word-break: break-word; hyphens: auto; }
+  .article-copy p + p { margin-top: 1.5rem; }
+  .article-sidebar { min-width: 0; }
+  .article-sidebar-heading { border-bottom: 2px solid #111; padding-bottom: 0.6rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+  .article-recent-list { margin-top: 1.3rem; display: grid; gap: 1.3rem; }
+  .article-recent-item { display: flex; gap: 0.9rem; align-items: baseline; }
+  .article-recent-index { font-family: "Space Grotesk", sans-serif; font-size: 1.3rem; font-weight: 700; font-style: italic; color: #b3b3b3; flex-shrink: 0; }
+  .article-recent-title { font-size: 1.05rem; font-weight: 700; line-height: 1.35; letter-spacing: -0.01em; color: #111; overflow-wrap: anywhere; word-break: break-word; }
+  .article-recent-title:hover { color: #f0372f; }
   .article-chapter { margin-bottom: 2.3rem; }
   .article-chapter-heading { position: relative; }
   .article-chapter-marker { position: absolute; top: 0.38em; left: -1.15rem; width: 0.7rem; height: 0.7rem; background: #f0372f; }
@@ -197,6 +204,7 @@
   .article-copy blockquote { overflow-wrap: anywhere; word-break: break-word; }
   .article-paragraph { margin-bottom: 1.75rem; }
   .article-caption, .article-cover-area figcaption { margin-top: 0.55rem; font-family: "DM Mono", monospace; font-size: 0.65rem !important; line-height: 1.5 !important; letter-spacing: 0.02em !important; color: #666; overflow-wrap: anywhere; word-break: break-word; }
+  .drop-cap { font-weight: 700; }
   .drop-cap::first-letter { float: left; margin: 0.03em 0.12em 0 0; color: #f0372f; font-family: "Space Grotesk", sans-serif; font-size: 4.9em; font-weight: 700; line-height: 0.72; }
   .article-gallery-wrap { width: min(100% - 2.5rem, 1240px); margin-inline: auto; }
   .gallery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; }
@@ -209,15 +217,16 @@
   .article-layout { width: min(100% - 4rem, 1400px); }
   .article-gallery-wrap { width: min(100% - 4rem, 1240px); }
   .home-masthead { grid-template-columns: minmax(0, 1fr) 250px; }
-  .article-hero-grid { display: grid; grid-template-columns: minmax(0, 1.38fr) minmax(250px, 0.62fr); gap: 3.5rem; align-items: end; }
   .gallery-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .gallery-grid > :first-child { grid-column: span 2; grid-row: span 2; aspect-ratio: auto; }
   .gallery-grid > *:not(:first-child) { aspect-ratio: 1/1; }
 }
 
 @media (min-width: 1024px) {
-  .article-layout { grid-template-columns: minmax(0, 1fr); }
-  .article-margin-note { display: none; }
+  .article-layout { grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); grid-template-areas: "title sidebar" "sections sidebar"; align-items: start; }
+  .article-title-area { grid-area: title; }
+  .article-copy { grid-area: sections; }
+  .article-sidebar { grid-area: sidebar; position: sticky; top: 2rem; }
 }
 
 @media (prefers-reduced-motion: no-preference) {

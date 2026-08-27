@@ -4,9 +4,9 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import About from "./pages/About";
 import Article from "./pages/Article";
 import Category from "./pages/Category";
-import Contact from "./pages/Contact";
 import Gallery from "./pages/Gallery";
 import Home from "./pages/Home";
 import News from "./pages/News";
@@ -24,7 +24,7 @@ function Router() {
       <Route path={"/categoria/:slug"} component={Category} />
       <Route path={"/noticias"} component={News} />
       <Route path={"/multimedia"} component={Gallery} />
-      <Route path={"/contactos"} component={Contact} />
+      <Route path={"/sobre"} component={About} />
       <Route path={"/pesquisa"} component={Search} />
       <Route path={"/redacao"} component={EditorialDesk} />
       <Route path={"/redacao/multimedia"} component={GalleryEditor} />
