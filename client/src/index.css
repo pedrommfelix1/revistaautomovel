@@ -230,7 +230,7 @@
 }
 
 @media (min-width: 1024px) {
-  .article-layout { grid-template-columns: minmax(0, 1fr) minmax(440px, 58%); grid-template-areas: "title sidebar" "sections sidebar"; align-items: start; column-gap: 3rem; }
+  .article-layout { grid-template-columns: minmax(0, 1fr) minmax(340px, 440px); grid-template-areas: "title sidebar" "sections sidebar"; align-items: start; }
   .article-title-area { grid-area: title; }
   .article-copy { grid-area: sections; }
   .article-sidebar { grid-area: sidebar; position: sticky; top: 2rem; }
