@@ -80,7 +80,7 @@ function ArticleSidebar({ article, magazine, activeImage }: { article: ArticleDa
     <aside className="article-sidebar">
       {displayImage && (
         <figure className="article-cover-area">
-          <img key={displayImage.url} src={displayImage.url} alt="" className={`w-full object-cover ${magazine ? "aspect-[4/5] article-cover-fade" : "aspect-square"}`} />
+          <img key={displayImage.url} src={displayImage.url} alt="" className={`w-full ${magazine ? "aspect-[4/5] bg-[#e9e9e7] object-contain article-cover-fade" : "aspect-square object-cover"}`} />
           {displayImage.caption && <figcaption>{displayImage.caption}</figcaption>}
         </figure>
       )}
