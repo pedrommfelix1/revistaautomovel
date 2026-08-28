@@ -1235,6 +1235,29 @@ function registerPasswordAuthRoutes(app2) {
 }
 
 // server/_core/storageProxy.ts
+var PRESIGN_CACHE_TTL_MS = 45 * 60 * 1e3;
+var BROWSER_CACHE_MAX_AGE_S = 25 * 60;
+var presignCache = /* @__PURE__ */ new Map();
+async function getSignedUrl(key) {
+  const cached = presignCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.url;
+  const forgeUrl = new URL(
+    "v1/storage/presign/get",
+    ENV.forgeApiUrl.replace(/\/+$/, "") + "/"
+  );
+  forgeUrl.searchParams.set("path", key);
+  const forgeResp = await fetch(forgeUrl, {
+    headers: { Authorization: `Bearer ${ENV.forgeApiKey}` }
+  });
+  if (!forgeResp.ok) {
+    const body = await forgeResp.text().catch(() => "");
+    throw new Error(`Storage backend error (${forgeResp.status}): ${body}`);
+  }
+  const { url } = await forgeResp.json();
+  if (!url) throw new Error("Empty signed URL from backend");
+  presignCache.set(key, { url, expiresAt: Date.now() + PRESIGN_CACHE_TTL_MS });
+  return url;
+}
 function registerStorageProxy(app2) {
   app2.get("/manus-storage/*", async (req, res) => {
     const key = req.params[0];
@@ -1247,26 +1270,8 @@ function registerStorageProxy(app2) {
       return;
     }
     try {
-      const forgeUrl = new URL(
-        "v1/storage/presign/get",
-        ENV.forgeApiUrl.replace(/\/+$/, "") + "/"
-      );
-      forgeUrl.searchParams.set("path", key);
-      const forgeResp = await fetch(forgeUrl, {
-        headers: { Authorization: `Bearer ${ENV.forgeApiKey}` }
-      });
-      if (!forgeResp.ok) {
-        const body = await forgeResp.text().catch(() => "");
-        console.error(`[StorageProxy] forge error: ${forgeResp.status} ${body}`);
-        res.status(502).send("Storage backend error");
-        return;
-      }
-      const { url } = await forgeResp.json();
-      if (!url) {
-        res.status(502).send("Empty signed URL from backend");
-        return;
-      }
-      res.set("Cache-Control", "no-store");
+      const url = await getSignedUrl(key);
+      res.set("Cache-Control", `public, max-age=${BROWSER_CACHE_MAX_AGE_S}`);
       res.redirect(307, url);
     } catch (err) {
       console.error("[StorageProxy] failed:", err);
