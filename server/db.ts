@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { articleCategories, articleImages, articles, articleSections, categories, InsertUser, magazineIssues, siteGalleryImages, users } from "../drizzle/schema";
+import { articleCategories, articleImages, articles, articleSections, categories, InsertUser, loginAttempts, magazineIssues, siteGalleryImages, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -87,6 +87,43 @@ export async function getUserByOpenId(openId: string) {
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
 
   return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getUserByUsername(username: string) {
+  const db = await requireDb();
+  const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
+  return user ?? null;
+}
+
+export async function setUserPassword(userId: number, input: { passwordHash: string; mustChangePassword: boolean; passwordChangedAt: Date }) {
+  const db = await requireDb();
+  await db.update(users).set({
+    passwordHash: input.passwordHash,
+    mustChangePassword: input.mustChangePassword,
+    passwordChangedAt: input.passwordChangedAt,
+  }).where(eq(users.id, userId));
+}
+
+export async function recordLogin(userId: number, ip: string) {
+  const db = await requireDb();
+  await db.update(users).set({ lastSignedIn: new Date(), lastLoginIp: ip }).where(eq(users.id, userId));
+}
+
+export async function getLoginAttempts(bucketKey: string) {
+  const db = await requireDb();
+  const [record] = await db.select().from(loginAttempts).where(eq(loginAttempts.bucketKey, bucketKey)).limit(1);
+  return record ?? null;
+}
+
+export async function setLoginAttempts(bucketKey: string, input: { failures: number; firstFailureAt: Date; blockedUntil: Date | null }) {
+  const db = await requireDb();
+  await db.insert(loginAttempts).values({ bucketKey, ...input })
+    .onDuplicateKeyUpdate({ set: input });
+}
+
+export async function deleteLoginAttempts(bucketKey: string) {
+  const db = await requireDb();
+  await db.delete(loginAttempts).where(eq(loginAttempts.bucketKey, bucketKey));
 }
 
 type SectionInput = {

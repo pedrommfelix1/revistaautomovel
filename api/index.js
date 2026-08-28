@@ -26,7 +26,26 @@ var users = mysqlTable("users", {
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull()
+  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  /** Username for password login (backoffice). Null for OAuth-only accounts. */
+  username: varchar("username", { length: 60 }).unique(),
+  /** scrypt hash, "scrypt$N$r$p$salt$hash" — the password itself is never stored. */
+  passwordHash: text("passwordHash"),
+  mustChangePassword: boolean("mustChangePassword").default(false).notNull(),
+  /**
+   * Bumped every time the password changes. Embedded in session cookies as a
+   * "pwv" claim (see server/_core/sdk.ts) so a password change invalidates
+   * every session issued before it, without needing a server-side session
+   * table just for that.
+   */
+  passwordChangedAt: timestamp("passwordChangedAt"),
+  lastLoginIp: varchar("lastLoginIp", { length: 64 })
+});
+var loginAttempts = mysqlTable("loginAttempts", {
+  bucketKey: varchar("bucketKey", { length: 128 }).primaryKey(),
+  failures: int("failures").default(0).notNull(),
+  firstFailureAt: timestamp("firstFailureAt").defaultNow().notNull(),
+  blockedUntil: timestamp("blockedUntil")
 });
 var categories = mysqlTable("categories", {
   id: int("id").autoincrement().primaryKey(),
@@ -113,8 +132,7 @@ var ENV = {
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
-  adminAccessToken: process.env.ADMIN_ACCESS_TOKEN ?? ""
+  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? ""
 };
 
 // server/db.ts
@@ -186,6 +204,36 @@ async function getUserByOpenId(openId) {
   }
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
   return result.length > 0 ? result[0] : void 0;
+}
+async function getUserByUsername(username) {
+  const db = await requireDb();
+  const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
+  return user ?? null;
+}
+async function setUserPassword(userId, input) {
+  const db = await requireDb();
+  await db.update(users).set({
+    passwordHash: input.passwordHash,
+    mustChangePassword: input.mustChangePassword,
+    passwordChangedAt: input.passwordChangedAt
+  }).where(eq(users.id, userId));
+}
+async function recordLogin(userId, ip) {
+  const db = await requireDb();
+  await db.update(users).set({ lastSignedIn: /* @__PURE__ */ new Date(), lastLoginIp: ip }).where(eq(users.id, userId));
+}
+async function getLoginAttempts(bucketKey2) {
+  const db = await requireDb();
+  const [record] = await db.select().from(loginAttempts).where(eq(loginAttempts.bucketKey, bucketKey2)).limit(1);
+  return record ?? null;
+}
+async function setLoginAttempts(bucketKey2, input) {
+  const db = await requireDb();
+  await db.insert(loginAttempts).values({ bucketKey: bucketKey2, ...input }).onDuplicateKeyUpdate({ set: input });
+}
+async function deleteLoginAttempts(bucketKey2) {
+  const db = await requireDb();
+  await db.delete(loginAttempts).where(eq(loginAttempts.bucketKey, bucketKey2));
 }
 async function requireDb() {
   const db = await getDb();
@@ -642,7 +690,8 @@ var SDKServer = class {
       {
         openId,
         appId: ENV.appId,
-        name: options.name || ""
+        name: options.name || "",
+        pwv: options.pwv
       },
       options
     );
@@ -655,7 +704,8 @@ var SDKServer = class {
     return new SignJWT({
       openId: payload.openId,
       appId: payload.appId,
-      name: payload.name
+      name: payload.name,
+      ...payload.pwv !== void 0 ? { pwv: payload.pwv } : {}
     }).setProtectedHeader({ alg: "HS256", typ: "JWT" }).setExpirationTime(expirationSeconds).sign(secretKey);
   }
   async verifySession(cookieValue) {
@@ -668,7 +718,7 @@ var SDKServer = class {
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"]
       });
-      const { openId, appId, name } = payload;
+      const { openId, appId, name, pwv } = payload;
       if (!isNonEmptyString(openId) || !isNonEmptyString(appId) || !isNonEmptyString(name)) {
         console.warn("[Auth] Session payload missing required fields");
         return null;
@@ -676,7 +726,8 @@ var SDKServer = class {
       return {
         openId,
         appId,
-        name
+        name,
+        pwv: typeof pwv === "number" ? pwv : void 0
       };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));
@@ -744,6 +795,9 @@ var SDKServer = class {
     }
     if (!user) {
       throw ForbiddenError("User not found");
+    }
+    if (user.passwordChangedAt && session.pwv !== user.passwordChangedAt.getTime()) {
+      throw ForbiddenError("Session invalidated by a password change");
     }
     await upsertUser({
       openId: user.openId,
@@ -876,6 +930,16 @@ function getQueryParam(req, key) {
   const value = req.query[key];
   return typeof value === "string" ? value : void 0;
 }
+async function mintSessionCookie(req, res, openId, name) {
+  const user = await getUserByOpenId(openId);
+  const sessionToken = await sdk.createSessionToken(openId, {
+    name,
+    expiresInMs: ONE_YEAR_MS,
+    pwv: user?.passwordChangedAt?.getTime()
+  });
+  const cookieOptions = getSessionCookieOptions(req);
+  res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+}
 function registerOAuthRoutes(app2) {
   app2.get("/api/oauth/callback", async (req, res) => {
     const code = getQueryParam(req, "code");
@@ -905,12 +969,7 @@ function registerOAuthRoutes(app2) {
         loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
         lastSignedIn: /* @__PURE__ */ new Date()
       });
-      const sessionToken = await sdk.createSessionToken(userInfo.openId, {
-        name: userInfo.name || "",
-        expiresInMs: ONE_YEAR_MS
-      });
-      const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      await mintSessionCookie(req, res, userInfo.openId, userInfo.name || "");
       res.redirect(302, "/");
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
@@ -928,12 +987,7 @@ function registerOAuthRoutes(app2) {
       }
       try {
         await upsertUser({ openId, name, lastSignedIn: /* @__PURE__ */ new Date() });
-        const sessionToken = await sdk.createSessionToken(openId, {
-          name,
-          expiresInMs: ONE_YEAR_MS
-        });
-        const cookieOptions = getSessionCookieOptions(req);
-        res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        await mintSessionCookie(req, res, openId, name);
         res.redirect(302, asTestUser ? "/" : "/redacao");
       } catch (error) {
         console.error("[Dev login] Failed", error);
@@ -941,33 +995,242 @@ function registerOAuthRoutes(app2) {
       }
     });
   }
-  app2.get("/api/admin-login", async (req, res) => {
-    const token = getQueryParam(req, "token");
-    if (!ENV.adminAccessToken || !token || token !== ENV.adminAccessToken) {
-      res.status(403).send("Forbidden");
+}
+
+// server/_core/rateLimit.ts
+import { createHash } from "node:crypto";
+var WINDOW_MS = 15 * 60 * 1e3;
+var ESCALATION = {
+  account: [
+    [20, 24 * 60 * 60 * 1e3],
+    [10, 60 * 60 * 1e3],
+    [5, 15 * 60 * 1e3]
+  ],
+  ip: [
+    [40, 24 * 60 * 60 * 1e3],
+    [20, 60 * 60 * 1e3],
+    [10, 15 * 60 * 1e3]
+  ]
+};
+function bucketKey(type, id) {
+  return `${type}:${createHash("sha256").update(id).digest("base64url")}`;
+}
+function lockoutFor(type, failures) {
+  for (const [threshold, duration] of ESCALATION[type]) {
+    if (failures >= threshold) return duration;
+  }
+  return 0;
+}
+async function checkLimit(type, id) {
+  const record = await getLoginAttempts(bucketKey(type, id));
+  if (!record?.blockedUntil) return { blocked: false, seconds: 0 };
+  const remaining = record.blockedUntil.getTime() - Date.now();
+  if (remaining <= 0) return { blocked: false, seconds: 0 };
+  return { blocked: true, seconds: Math.ceil(remaining / 1e3) };
+}
+async function recordFailure(type, id) {
+  const key = bucketKey(type, id);
+  const now = /* @__PURE__ */ new Date();
+  const existing = await getLoginAttempts(key);
+  let failures = existing?.failures ?? 0;
+  let firstFailureAt = existing?.firstFailureAt ?? now;
+  const stillBlocked = Boolean(existing?.blockedUntil && existing.blockedUntil.getTime() > now.getTime());
+  if (!stillBlocked && now.getTime() - firstFailureAt.getTime() > WINDOW_MS) {
+    failures = 0;
+    firstFailureAt = now;
+  }
+  failures += 1;
+  const duration = lockoutFor(type, failures);
+  const blockedUntil = duration ? new Date(now.getTime() + duration) : null;
+  await setLoginAttempts(key, { failures, firstFailureAt, blockedUntil });
+}
+async function clearFailures(type, id) {
+  await deleteLoginAttempts(bucketKey(type, id));
+}
+
+// server/_core/csrf.ts
+function isSameOrigin(req) {
+  const host = req.headers.host;
+  const source = req.headers.origin || req.headers.referer;
+  if (!host || !source) return false;
+  try {
+    return new URL(source).host === host;
+  } catch {
+    return false;
+  }
+}
+
+// server/_core/password.ts
+import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+var SCRYPT_PARAMS = { N: 32768, r: 8, p: 1, maxmem: 96 * 1024 * 1024 };
+var KEY_LEN = 64;
+var SALT_LEN = 16;
+var MIN_LENGTH = 10;
+var MAX_LENGTH = 200;
+var COMMON_PASSWORDS = [
+  "motordelinha",
+  "motordelinha2026",
+  "password",
+  "palavrapasse",
+  "administrador",
+  "adminadmin",
+  "123456789012",
+  "qwertyuiop12",
+  "111111111111",
+  "abcdefghijkl",
+  "passworD123"
+];
+function b64url(buf) {
+  return buf.toString("base64url");
+}
+function fromB64url(str) {
+  return Buffer.from(str, "base64url");
+}
+function safeEqual(a, b) {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return timingSafeEqual(bufA, bufB);
+}
+async function hashPassword(password) {
+  const salt = randomBytes(SALT_LEN);
+  const derived = scryptSync(password.normalize("NFKC"), salt, KEY_LEN, SCRYPT_PARAMS);
+  const { N, r, p } = SCRYPT_PARAMS;
+  return ["scrypt", N, r, p, b64url(salt), b64url(derived)].join("$");
+}
+async function verifyPassword(password, stored) {
+  if (!stored) return false;
+  const parts = stored.split("$");
+  if (parts.length !== 6 || parts[0] !== "scrypt") return false;
+  const [, N, r, p, saltB64, hashB64] = parts;
+  const params = { N: Number(N), r: Number(r), p: Number(p), maxmem: SCRYPT_PARAMS.maxmem };
+  if (!Number.isFinite(params.N) || !Number.isFinite(params.r) || !Number.isFinite(params.p)) return false;
+  const expected = fromB64url(hashB64);
+  let derived;
+  try {
+    derived = scryptSync(password.normalize("NFKC"), fromB64url(saltB64), expected.length, params);
+  } catch {
+    return false;
+  }
+  return safeEqual(b64url(derived), b64url(expected));
+}
+function validatePassword(password, context) {
+  const pwd = password.normalize("NFKC");
+  if (pwd.length < MIN_LENGTH) return `A palavra-passe tem de ter pelo menos ${MIN_LENGTH} caracteres.`;
+  if (pwd.length > MAX_LENGTH) return "A palavra-passe \xE9 demasiado longa.";
+  if (pwd.trim() !== pwd) return "A palavra-passe n\xE3o pode come\xE7ar nem acabar com espa\xE7os.";
+  const lower = pwd.toLowerCase();
+  if (COMMON_PASSWORDS.some((p) => lower === p || lower.includes(p))) {
+    return "Essa palavra-passe \xE9 demasiado previs\xEDvel. Escolha outra.";
+  }
+  for (const field of [context.username, context.displayName]) {
+    const value = String(field ?? "").trim().toLowerCase();
+    if (value.length >= 4 && lower.includes(value)) {
+      return "A palavra-passe n\xE3o pode conter o seu nome de utilizador nem o seu nome.";
+    }
+  }
+  if (/^(.)\1+$/.test(pwd)) return "A palavra-passe \xE9 demasiado previs\xEDvel. Escolha outra.";
+  if (new Set(pwd).size < 5) return "A palavra-passe tem pouca variedade de caracteres.";
+  return null;
+}
+
+// server/_core/passwordAuth.ts
+var FAILURE_FLOOR_MS = 400;
+function getClientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.length > 0) return forwarded.split(",")[0].trim();
+  return req.socket.remoteAddress ?? "unknown";
+}
+async function atLeast(startedAt, ms) {
+  const remaining = ms - (Date.now() - startedAt);
+  if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+}
+function rateLimitResponse(res, seconds) {
+  res.set("Retry-After", String(seconds));
+  res.status(429).json({ error: "Demasiadas tentativas. Tente novamente mais tarde.", retryAfter: seconds });
+}
+function registerPasswordAuthRoutes(app2) {
+  app2.post("/api/auth/login", async (req, res) => {
+    if (!isSameOrigin(req)) {
+      res.status(403).json({ error: "origem inv\xE1lida" });
       return;
     }
-    if (!ENV.ownerOpenId) {
-      res.status(500).json({ error: "OWNER_OPEN_ID not configured" });
+    const startedAt = Date.now();
+    const ip = getClientIp(req);
+    const ipLimit = await checkLimit("ip", ip);
+    if (ipLimit.blocked) {
+      rateLimitResponse(res, ipLimit.seconds);
       return;
     }
+    const username = String(req.body?.username ?? "").trim().toLowerCase();
+    const password = String(req.body?.password ?? "");
+    if (!username || !password) {
+      res.status(400).json({ error: "pedido inv\xE1lido" });
+      return;
+    }
+    const user = await getUserByUsername(username);
+    const accountBucket = user ? `user:${user.id}` : `unknown:${username}`;
+    const accountLimit = await checkLimit("account", accountBucket);
+    if (accountLimit.blocked) {
+      await atLeast(startedAt, FAILURE_FLOOR_MS);
+      rateLimitResponse(res, accountLimit.seconds);
+      return;
+    }
+    const passwordOk = await verifyPassword(password, user?.passwordHash ?? null);
+    if (!user || !passwordOk) {
+      await Promise.all([recordFailure("ip", ip), recordFailure("account", accountBucket)]);
+      await atLeast(startedAt, FAILURE_FLOOR_MS);
+      res.status(401).json({ error: "Credenciais inv\xE1lidas." });
+      return;
+    }
+    await Promise.all([clearFailures("ip", ip), clearFailures("account", accountBucket)]);
+    await mintSessionCookie(req, res, user.openId, user.name ?? user.username ?? "");
+    await recordLogin(user.id, ip);
+    res.json({ ok: true, mustChangePassword: user.mustChangePassword });
+  });
+  app2.post("/api/auth/password", async (req, res) => {
+    if (!isSameOrigin(req)) {
+      res.status(403).json({ error: "origem inv\xE1lida" });
+      return;
+    }
+    let authUser;
     try {
-      await upsertUser({
-        openId: ENV.ownerOpenId,
-        name: "Pedro F\xE9lix",
-        lastSignedIn: /* @__PURE__ */ new Date()
-      });
-      const sessionToken = await sdk.createSessionToken(ENV.ownerOpenId, {
-        name: "Pedro F\xE9lix",
-        expiresInMs: ONE_YEAR_MS
-      });
-      const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      res.redirect(302, "/redacao");
-    } catch (error) {
-      console.error("[Admin login] Failed", error);
-      res.status(500).json({ error: "Admin login failed" });
+      authUser = await sdk.authenticateRequest(req);
+    } catch {
+      res.status(401).json({ error: "sess\xE3o inv\xE1lida" });
+      return;
     }
+    const current = String(req.body?.current ?? "");
+    const next = String(req.body?.next ?? "");
+    const accountBucket = `user:${authUser.id}`;
+    const limit = await checkLimit("account", accountBucket);
+    if (limit.blocked) {
+      rateLimitResponse(res, limit.seconds);
+      return;
+    }
+    if (!await verifyPassword(current, authUser.passwordHash)) {
+      await recordFailure("account", accountBucket);
+      res.status(401).json({ error: "A palavra-passe atual est\xE1 errada." });
+      return;
+    }
+    const problem = validatePassword(next, { username: authUser.username, displayName: authUser.name });
+    if (problem) {
+      res.status(400).json({ error: problem });
+      return;
+    }
+    if (await verifyPassword(next, authUser.passwordHash)) {
+      res.status(400).json({ error: "A nova palavra-passe tem de ser diferente da atual." });
+      return;
+    }
+    await clearFailures("account", accountBucket);
+    const passwordChangedAt = /* @__PURE__ */ new Date();
+    const passwordHash = await hashPassword(next);
+    await setUserPassword(authUser.id, { passwordHash, mustChangePassword: false, passwordChangedAt });
+    await mintSessionCookie(req, res, authUser.openId, authUser.name ?? authUser.username ?? "");
+    res.json({ ok: true });
   });
 }
 
@@ -1375,7 +1638,14 @@ var appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
+    // Strip passwordHash — auth.me is a publicProcedure, so this is the one
+    // place ctx.user reaches the client. Never send the hash out, even
+    // though it's not the plaintext password.
+    me: publicProcedure.query(({ ctx }) => {
+      if (!ctx.user) return null;
+      const { passwordHash: _passwordHash, ...safeUser } = ctx.user;
+      return safeUser;
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -1413,6 +1683,7 @@ app.get("/api/health", (_req, res) => {
 });
 registerStorageProxy(app);
 registerOAuthRoutes(app);
+registerPasswordAuthRoutes(app);
 registerMagazineUploadRoute(app);
 app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 app.use((err, _req, res, _next) => {

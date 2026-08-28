@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerMagazineUploadRoute } from "./magazineUpload";
 import { registerOAuthRoutes } from "./oauth";
+import { registerPasswordAuthRoutes } from "./passwordAuth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -36,6 +37,7 @@ app.get("/api/health", (_req, res) => {
 
 registerStorageProxy(app);
 registerOAuthRoutes(app);
+registerPasswordAuthRoutes(app);
 registerMagazineUploadRoute(app);
 app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 

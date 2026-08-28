@@ -11,6 +11,23 @@ function getQueryParam(req: Request, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+/**
+ * Mints a session cookie for openId and sets it on the response. Looks up
+ * the account's current passwordChangedAt to embed as the session's "pwv"
+ * claim — every session, however it was created, has to carry the account's
+ * current password version once one is set (see sdk.authenticateRequest).
+ */
+export async function mintSessionCookie(req: Request, res: Response, openId: string, name: string) {
+  const user = await db.getUserByOpenId(openId);
+  const sessionToken = await sdk.createSessionToken(openId, {
+    name,
+    expiresInMs: ONE_YEAR_MS,
+    pwv: user?.passwordChangedAt?.getTime(),
+  });
+  const cookieOptions = getSessionCookieOptions(req);
+  res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+}
+
 export function registerOAuthRoutes(app: Express) {
   app.get("/api/oauth/callback", async (req: Request, res: Response) => {
     const code = getQueryParam(req, "code");
@@ -49,14 +66,7 @@ export function registerOAuthRoutes(app: Express) {
         lastSignedIn: new Date(),
       });
 
-      const sessionToken = await sdk.createSessionToken(userInfo.openId, {
-        name: userInfo.name || "",
-        expiresInMs: ONE_YEAR_MS,
-      });
-
-      const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-
+      await mintSessionCookie(req, res, userInfo.openId, userInfo.name || "");
       res.redirect(302, "/");
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
@@ -84,14 +94,7 @@ export function registerOAuthRoutes(app: Express) {
 
       try {
         await db.upsertUser({ openId, name, lastSignedIn: new Date() });
-
-        const sessionToken = await sdk.createSessionToken(openId, {
-          name,
-          expiresInMs: ONE_YEAR_MS,
-        });
-
-        const cookieOptions = getSessionCookieOptions(req);
-        res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        await mintSessionCookie(req, res, openId, name);
         res.redirect(302, asTestUser ? "/" : "/redacao");
       } catch (error) {
         console.error("[Dev login] Failed", error);
@@ -99,41 +102,4 @@ export function registerOAuthRoutes(app: Express) {
       }
     });
   }
-
-  // Manual admin entry point for deployments (e.g. Vercel) where the real
-  // Manus OAuth redirect URI isn't registered. Only works when ADMIN_ACCESS_TOKEN
-  // is set and the caller supplies the exact same value as ?token= — without
-  // that env var configured, this route always rejects, so it's inert unless
-  // the owner deliberately opts in.
-  app.get("/api/admin-login", async (req: Request, res: Response) => {
-    const token = getQueryParam(req, "token");
-    if (!ENV.adminAccessToken || !token || token !== ENV.adminAccessToken) {
-      res.status(403).send("Forbidden");
-      return;
-    }
-    if (!ENV.ownerOpenId) {
-      res.status(500).json({ error: "OWNER_OPEN_ID not configured" });
-      return;
-    }
-
-    try {
-      await db.upsertUser({
-        openId: ENV.ownerOpenId,
-        name: "Pedro Félix",
-        lastSignedIn: new Date(),
-      });
-
-      const sessionToken = await sdk.createSessionToken(ENV.ownerOpenId, {
-        name: "Pedro Félix",
-        expiresInMs: ONE_YEAR_MS,
-      });
-
-      const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      res.redirect(302, "/redacao");
-    } catch (error) {
-      console.error("[Admin login] Failed", error);
-      res.status(500).json({ error: "Admin login failed" });
-    }
-  });
 }

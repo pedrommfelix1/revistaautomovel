@@ -57,6 +57,13 @@
       "when": 1787923232725,
       "tag": "0007_fluffy_microchip",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1787932619155,
+      "tag": "0008_dark_vargas",
+      "breakpoints": true
     }
   ]
 }

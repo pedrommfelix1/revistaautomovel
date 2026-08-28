@@ -1,4 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { ChangePasswordForm } from "@/components/ChangePasswordForm";
+import { LoginForm } from "@/components/LoginForm";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -19,18 +21,17 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { BookOpen, FilePenLine, House, Images, LogOut, PanelLeft } from "lucide-react";
+import { BookOpen, FilePenLine, House, Images, KeyRound, LogOut, PanelLeft } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
-import { Button } from "./ui/button";
 
 const menuItems = [
   { icon: FilePenLine, label: "Artigos", path: "/redacao" },
   { icon: Images, label: "Multimédia", path: "/redacao/multimedia" },
   { icon: BookOpen, label: "Revista", path: "/redacao/revista" },
+  { icon: KeyRound, label: "Conta", path: "/redacao/conta" },
   { icon: House, label: "Ver site", path: "/" },
 ];
 
@@ -48,7 +49,7 @@ export default function DashboardLayout({
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
-  const { loading, user } = useAuth();
+  const { loading, user, refresh } = useAuth();
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
@@ -59,10 +60,9 @@ export default function DashboardLayout({
   }
 
   if (!user) {
-    if (import.meta.env.DEV) {
-      // Local dev: the real Manus OAuth login can't complete against
-      // localhost, so sign in automatically as the site owner instead of
-      // showing the login gate.
+    if (import.meta.env.DEV && !window.location.search.includes("testlogin")) {
+      // Local dev shortcut only — never reachable in production. Add
+      // ?testlogin to the URL to see the real login form while developing it.
       window.location.href = "/api/dev/login";
       return <DashboardLayoutSkeleton />;
     }
@@ -75,16 +75,28 @@ export default function DashboardLayout({
               Entrar na redação
             </h1>
             <p className="text-sm text-muted-foreground text-center max-w-sm">
-              A área de publicação requer autenticação. Inicie sessão para criar e gerir histórias.
+              Indique o utilizador e a palavra-passe para aceder à área de publicação.
             </p>
           </div>
-          <Button
-            onClick={() => startLogin()}
-            size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all"
-          >
-              Iniciar sessão
-          </Button>
+          <LoginForm onSuccess={() => void refresh()} />
+        </div>
+      </div>
+    );
+  }
+
+  if (user.mustChangePassword) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
+          <div className="flex flex-col items-center gap-6">
+            <h1 className="text-2xl font-semibold tracking-tight text-center">
+              Defina uma nova palavra-passe
+            </h1>
+            <p className="text-sm text-muted-foreground text-center max-w-sm">
+              Antes de continuar, tem de trocar a palavra-passe temporária por uma definitiva.
+            </p>
+          </div>
+          <ChangePasswordForm submitLabel="Definir palavra-passe" onSuccess={() => void refresh()} />
         </div>
       </div>
     );

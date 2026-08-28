@@ -16,6 +16,7 @@ import EditorialDesk from "./pages/EditorialDesk";
 import ArticleEditor from "./pages/ArticleEditor";
 import GalleryEditor from "./pages/GalleryEditor";
 import MagazineEditor from "./pages/MagazineEditor";
+import Account from "./pages/Account";
 import Search from "./pages/Search";
 
 function Router() {
@@ -34,6 +35,7 @@ function Router() {
       <Route path={"/redacao"} component={EditorialDesk} />
       <Route path={"/redacao/multimedia"} component={GalleryEditor} />
       <Route path={"/redacao/revista"} component={MagazineEditor} />
+      <Route path={"/redacao/conta"} component={Account} />
       <Route path={"/redacao/:id"} component={ArticleEditor} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}

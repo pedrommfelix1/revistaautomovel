@@ -20,10 +20,31 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  /** Username for password login (backoffice). Null for OAuth-only accounts. */
+  username: varchar("username", { length: 60 }).unique(),
+  /** scrypt hash, "scrypt$N$r$p$salt$hash" — the password itself is never stored. */
+  passwordHash: text("passwordHash"),
+  mustChangePassword: boolean("mustChangePassword").default(false).notNull(),
+  /**
+   * Bumped every time the password changes. Embedded in session cookies as a
+   * "pwv" claim (see server/_core/sdk.ts) so a password change invalidates
+   * every session issued before it, without needing a server-side session
+   * table just for that.
+   */
+  passwordChangedAt: timestamp("passwordChangedAt"),
+  lastLoginIp: varchar("lastLoginIp", { length: 64 }),
 });
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+/** Brute-force guard for /api/auth/login — one row per (type, hashed id) bucket. */
+export const loginAttempts = mysqlTable("loginAttempts", {
+  bucketKey: varchar("bucketKey", { length: 128 }).primaryKey(),
+  failures: int("failures").default(0).notNull(),
+  firstFailureAt: timestamp("firstFailureAt").defaultNow().notNull(),
+  blockedUntil: timestamp("blockedUntil"),
+});
 
 export const categories = mysqlTable("categories", {
   id: int("id").autoincrement().primaryKey(),
