@@ -1,6 +1,6 @@
 import type { inferRouterOutputs } from "@trpc/server";
-import { ArrowLeft, Clock3, Search, Share2 } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { ArrowLeft, Clock3, Newspaper, Search, Share2 } from "lucide-react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import type { AppRouter } from "../../../server/routers";
 import { EditorialFooter } from "@/components/EditorialFooter";
@@ -10,8 +10,25 @@ import { useArticleHead } from "@/components/Head";
 import { trpc } from "@/lib/trpc";
 import { estimateReadingMinutes } from "../../../shared/editorial";
 
+const MAGAZINE_MODE_KEY = "motor-de-linha-magazine-mode";
+
+// Persists site-wide (not per-article) so a reader who switches to "modo
+// revista" keeps that preference as they browse to other articles.
+function useMagazineMode(): [boolean, () => void] {
+  const [enabled, setEnabled] = useState(() => {
+    try { return localStorage.getItem(MAGAZINE_MODE_KEY) === "1"; } catch { return false; }
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem(MAGAZINE_MODE_KEY, enabled ? "1" : "0"); } catch { /* private browsing, etc. */ }
+  }, [enabled]);
+
+  return [enabled, () => setEnabled((current) => !current)];
+}
+
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 type ArticleData = NonNullable<RouterOutputs["editorial"]["bySlug"]>;
+type GalleryFrame = { url: string; caption: string | null };
 
 function formatFullDate(value: Date | string | null) {
   if (!value) return "Edição Motor de Linha";
@@ -46,7 +63,7 @@ function RecentArticlesList({ items }: { items: { id: number; slug: string; titl
   );
 }
 
-function ArticleSidebar({ article }: { article: ArticleData }) {
+function ArticleSidebar({ article, magazine, activeImage }: { article: ArticleData; magazine: boolean; activeImage: GalleryFrame | null }) {
   const [, setLocation] = useLocation();
   const [query, setQuery] = useState("");
   const items = useRecentArticles(article.id);
@@ -57,12 +74,14 @@ function ArticleSidebar({ article }: { article: ArticleData }) {
     if (next.length >= 2) setLocation(`/pesquisa?q=${encodeURIComponent(next)}`);
   }
 
+  const displayImage = magazine && activeImage ? activeImage : article.coverImageUrl ? { url: article.coverImageUrl, caption: article.coverImageCaption } : null;
+
   return (
     <aside className="article-sidebar">
-      {article.coverImageUrl && (
+      {displayImage && (
         <figure className="article-cover-area">
-          <img src={article.coverImageUrl} alt="" className="aspect-square w-full object-cover" />
-          {article.coverImageCaption && <figcaption>{article.coverImageCaption}</figcaption>}
+          <img key={displayImage.url} src={displayImage.url} alt="" className={`aspect-[4/5] w-full object-cover ${magazine ? "article-cover-fade" : ""}`} />
+          {displayImage.caption && <figcaption>{displayImage.caption}</figcaption>}
         </figure>
       )}
 
@@ -92,18 +111,72 @@ function ArticleRecentMobile({ article }: { article: ArticleData }) {
   );
 }
 
-function ArticleSections({ article }: { article: ArticleData }) {
-  const openingIndex = article.sections.findIndex((section) => Boolean(section.body));
+function ArticleSections({ article, magazine, galleryCount, onActiveImageChange }: { article: ArticleData; magazine: boolean; galleryCount: number; onActiveImageChange: (index: number) => void }) {
+  const openingIndex = article.sections.findIndex((section) => section.type !== "suggested" && Boolean(section.body));
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // In "modo revista", the sticky photo cycles through the article's gallery
+  // as the reader scrolls. This tracks continuous scroll progress through the
+  // whole body (not per-section) so it steps through every image evenly —
+  // with only a handful of sections but many more gallery photos, mapping by
+  // section index alone would skip most of them.
+  useEffect(() => {
+    if (!magazine || galleryCount <= 1) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    let ticking = false;
+    function update() {
+      ticking = false;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const triggerLine = window.innerHeight * 0.3;
+      const progress = (triggerLine - rect.top) / rect.height;
+      const clamped = Math.min(1, Math.max(0, progress));
+      onActiveImageChange(Math.min(galleryCount - 1, Math.floor(clamped * galleryCount)));
+    }
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(update);
+    }
+
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [magazine, galleryCount, onActiveImageChange]);
+
   return (
-    <div className="article-copy">
+    <div className="article-copy" ref={containerRef}>
       {article.sections.map((section, index) => {
+        if (section.type === "suggested") {
+          const items = section.suggestedArticles ?? [];
+          if (!items.length) return null;
+          return (
+            <aside key={section.id} className="article-suggested">
+              <p className="article-suggested-label">{section.heading || "Também pode ler"}</p>
+              <div className="article-suggested-grid">
+                {items.map((item) => (
+                  <Link key={item.id} href={`/artigo/${item.slug}`} className="article-suggested-card no-underline text-black">
+                    {item.coverImageUrl ? <img src={item.coverImageUrl} alt="" /> : <div className="aspect-[4/3] w-full bg-[#e9e9e7]" />}
+                    <span className="article-suggested-title">{item.title}</span>
+                  </Link>
+                ))}
+              </div>
+            </aside>
+          );
+        }
         if (section.type === "quote") {
           return <figure key={section.id} className="my-12 border-y-2 border-black py-7 sm:my-16 sm:py-9"><blockquote className="text-3xl font-black leading-[0.98] tracking-[-0.055em] sm:text-4xl">“{section.body}”</blockquote>{section.caption && <figcaption className="mt-5 font-mono text-[10px] uppercase tracking-[0.12em] text-neutral-500">{section.caption}</figcaption>}</figure>;
         }
         if (section.type === "chapter") {
-          // Each chapter opens with its own drop cap, not just the article's first block.
+          const isOpening = index === openingIndex;
           const paragraphs = section.body ? splitParagraphs(section.body) : [];
-          return <section key={section.id} className="article-chapter"><div className="article-chapter-heading mb-4"><span className="article-chapter-marker" /><h2>{section.heading}</h2></div>{paragraphs.map((paragraph, paragraphIndex) => <p key={paragraphIndex} className={paragraphIndex === 0 ? "drop-cap" : ""}>{paragraph}</p>)}{section.caption && <p className="article-caption">{section.caption}</p>}</section>;
+          return <section key={section.id} className="article-chapter"><div className="article-chapter-heading mb-4"><span className="article-chapter-marker" /><h2>{section.heading}</h2></div>{paragraphs.map((paragraph, paragraphIndex) => <p key={paragraphIndex} className={isOpening && paragraphIndex === 0 ? "drop-cap" : ""}>{paragraph}</p>)}{section.caption && <p className="article-caption">{section.caption}</p>}</section>;
         }
         const isOpening = index === openingIndex;
         const paragraphs = section.body ? splitParagraphs(section.body) : [];
@@ -117,6 +190,19 @@ export default function Article() {
   const [, params] = useRoute("/artigo/:slug");
   const { data: article, isLoading } = trpc.editorial.bySlug.useQuery({ slug: params?.slug ?? "" }, { enabled: Boolean(params?.slug) });
   useArticleHead({ title: article?.seoTitle || article?.title, description: article?.seoDescription || article?.deck, image: article?.socialImageUrl || article?.coverImageUrl, slug: article?.slug });
+  const [magazine, toggleMagazine] = useMagazineMode();
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const handleActiveImageChange = useCallback((index: number) => setActiveImageIndex(index), []);
+
+  const galleryFrames = useMemo<GalleryFrame[]>(() => {
+    if (!article) return [];
+    const frames: GalleryFrame[] = [];
+    if (article.coverImageUrl) frames.push({ url: article.coverImageUrl, caption: article.coverImageCaption });
+    article.images.forEach((image) => frames.push({ url: image.url, caption: image.caption }));
+    return frames;
+  }, [article]);
+
+  useEffect(() => { setActiveImageIndex(0); }, [article?.id]);
 
   if (isLoading) return <div className="min-h-screen bg-white"><EditorialHeader /><div className="editorial-shell py-28 font-mono text-xs uppercase tracking-[0.15em]">A preparar leitura…</div></div>;
   if (!article) return <div className="flex min-h-screen flex-col bg-white"><EditorialHeader /><main className="editorial-shell flex-1 py-28"><p className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#f0372f]">404 / Artigo indisponível</p><h1 className="mt-4 max-w-xl text-5xl font-black tracking-[-0.07em]">Esta estrada não tem história.</h1><Link href="/" className="mt-8 inline-flex items-center gap-2 border-b-2 border-black pb-1 text-sm font-bold uppercase tracking-[0.1em]"><ArrowLeft size={16} /> Voltar ao início</Link></main><EditorialFooter /></div>;
@@ -127,9 +213,14 @@ export default function Article() {
       <EditorialHeader />
       <main className="flex-1">
         <div className="editorial-shell pt-7 sm:pt-11">
-          <Link href="/" className="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-500 transition-colors hover:text-black"><ArrowLeft size={14} /> Índice</Link>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <Link href="/" className="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-500 transition-colors hover:text-black"><ArrowLeft size={14} /> Índice</Link>
+            <button onClick={toggleMagazine} className="inline-flex items-center gap-2 border border-black px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition-colors hover:bg-black hover:text-white">
+              <Newspaper size={13} /> {magazine ? "Ver em modo leitura" : "Experimentar modo revista"}
+            </button>
+          </div>
 
-          <div className="article-layout mt-8 border-t-2 border-black pt-5 sm:mt-11 sm:pt-7">
+          <div className={`article-layout mt-8 border-t-2 border-black pt-5 sm:mt-11 sm:pt-7 ${magazine ? "article-layout--magazine" : ""}`}>
             <div className="article-title-area">
               <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-bold uppercase tracking-[0.14em]"><span className="text-[#f0372f]">{article.categories.map((category) => category.name).join(" / ") || "Editorial"}</span><span className="text-neutral-500">N.º {String(article.id).padStart(2, "0")}</span></div>
               <h1>{article.articleTitle || article.title}</h1>
@@ -142,8 +233,8 @@ export default function Article() {
               </div>
             </div>
 
-            <ArticleSidebar article={article} />
-            <ArticleSections article={article} />
+            <ArticleSidebar article={article} magazine={magazine} activeImage={galleryFrames[activeImageIndex] ?? null} />
+            <ArticleSections article={article} magazine={magazine} galleryCount={galleryFrames.length} onActiveImageChange={handleActiveImageChange} />
           </div>
         </div>
 

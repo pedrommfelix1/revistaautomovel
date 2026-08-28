@@ -14,7 +14,63 @@ import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Link, useLocation, useRoute } from "wouter";
 
-type EditorSection = { type: "paragraph" | "chapter" | "quote"; heading: string | null; body: string | null; caption: string | null; position: number };
+type EditorSection = { type: "paragraph" | "chapter" | "quote" | "suggested"; heading: string | null; body: string | null; caption: string | null; position: number };
+type PickableArticle = { id: number; title: string; status: "draft" | "published" };
+
+// "suggested" sections store their picks as a comma-separated list of article
+// ids in `body` (see server/db.ts parseSuggestedArticleIds) — no new table,
+// consistent with how every other section type already just repurposes the
+// same handful of text columns.
+function SuggestedArticlesPicker({ section, onChange, allArticles, excludeId }: { section: EditorSection; onChange: (body: string) => void; allArticles: PickableArticle[]; excludeId: number }) {
+  const [search, setSearch] = useState("");
+  const selectedIds = (section.body ?? "").split(",").map(Number).filter((value) => Number.isInteger(value) && value > 0);
+  const results = search.trim().length >= 2
+    ? allArticles.filter((item) => item.id !== excludeId && !selectedIds.includes(item.id) && item.title.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 6)
+    : [];
+
+  function addArticle(id: number) {
+    if (selectedIds.length >= 3) { toast.error("Máximo de 3 sugestões por bloco."); return; }
+    onChange([...selectedIds, id].join(","));
+    setSearch("");
+  }
+  function removeArticle(id: number) {
+    onChange(selectedIds.filter((value) => value !== id).join(","));
+  }
+
+  return (
+    <div>
+      {selectedIds.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {selectedIds.map((id) => {
+            const found = allArticles.find((item) => item.id === id);
+            return (
+              <span key={id} className="inline-flex items-center gap-1.5 border border-black px-2 py-1 text-xs">
+                {found?.title ?? `Artigo #${id}`}
+                {found && found.status !== "published" && <span className="text-neutral-400">(rascunho)</span>}
+                <button type="button" onClick={() => removeArticle(id)} aria-label="Remover sugestão"><X size={12} /></button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+      {selectedIds.length < 3 && (
+        <div className="relative">
+          <Input value={search} onChange={(event) => setSearch(event.target.value)} className="editor-input" placeholder="Procurar um artigo para sugerir…" />
+          {results.length > 0 && (
+            <div className="absolute z-10 mt-1 w-full border border-black bg-white shadow-lg">
+              {results.map((item) => (
+                <button key={item.id} type="button" onClick={() => addArticle(item.id)} className="block w-full px-3 py-2 text-left text-sm hover:bg-neutral-100">
+                  {item.title} {item.status !== "published" && <span className="text-neutral-400">(rascunho)</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.1em] text-neutral-500">{selectedIds.length}/3 sugestões · só artigos publicados aparecem para os leitores.</p>
+    </div>
+  );
+}
 type EditorImage = { url: string; storageKey: string | null; altText: string | null; caption: string | null; position: number };
 type EditorMetadata = { title: string; articleTitle: string | null; slug: string; deck: string | null; authorName: string; coverImageUrl: string | null; coverImageCaption: string | null; seoTitle: string | null; seoDescription: string | null; socialImageUrl: string | null; isFeatured: boolean };
 
@@ -52,6 +108,7 @@ export default function ArticleEditor() {
   const articleId = Number(routeId);
   const isNew = routeId === "novo";
   const { data: categories = [] } = trpc.editorial.categories.useQuery();
+  const { data: allArticles = [] } = trpc.editorial.manage.list.useQuery();
   const detailQuery = trpc.editorial.manage.detail.useQuery({ id: articleId }, { enabled: Boolean(user) && Number.isInteger(articleId) && articleId > 0 });
   const createArticle = trpc.editorial.manage.create.useMutation({ onSuccess: (article) => { if (article) setLocation(`/redacao/${article.id}`); }, onError: (error) => toast.error(error.message) });
   const saveMetadata = trpc.editorial.manage.saveMetadata.useMutation();
@@ -159,7 +216,7 @@ export default function ArticleEditor() {
 
       <section className="editor-panel"><div className="editor-panel-heading"><span>02</span><h2>Imagem de abertura</h2></div><div className="grid gap-5 sm:grid-cols-[220px_1fr]"><label className="group relative flex aspect-[4/3] cursor-pointer items-center justify-center overflow-hidden border border-dashed border-black bg-neutral-50">{metadata.coverImageUrl ? <img src={metadata.coverImageUrl} alt="Pré-visualização da capa" className="h-full w-full object-cover" /> : <span className="flex flex-col items-center gap-2 text-center text-[10px] font-bold uppercase tracking-[0.1em]"><ImageUp size={20} /> Carregar capa</span>}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void handleImageUpload(event, "cover")} className="sr-only" />{metadata.coverImageUrl && <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-[10px] font-bold uppercase tracking-[0.1em] text-white opacity-0 transition-opacity group-hover:opacity-100">Substituir</span>}</label><div><Label htmlFor="cover-caption">Legenda da capa</Label><Textarea id="cover-caption" value={metadata.coverImageCaption ?? ""} onChange={(event) => setMetadata((current) => ({ ...current, coverImageCaption: event.target.value }))} className="editor-input min-h-24" placeholder="Contexto ou crédito da fotografia." /><p className="mt-3 font-mono text-[10px] leading-relaxed text-neutral-500">As imagens são otimizadas no navegador antes de serem guardadas. Para a melhor apresentação, prefira imagens horizontais com mais de 1600 px de largura.</p></div></div></section>
 
-      <section className="editor-panel"><div className="editor-panel-heading"><span>03</span><h2>Estrutura de leitura</h2><div className="ml-auto flex gap-2"><Button onClick={() => addSection("paragraph")} variant="outline" className="editor-add"><Plus size={13} /> Texto</Button><Button onClick={() => addSection("chapter")} variant="outline" className="editor-add"><Plus size={13} /> Capítulo</Button><Button onClick={() => addSection("quote")} variant="outline" className="editor-add"><Plus size={13} /> Citação</Button></div></div><p className="mb-4 font-mono text-[10px] uppercase tracking-[0.1em] text-neutral-500">Arraste o ícone à esquerda para ordenar os blocos.</p><div className="space-y-4">{sections.length ? sections.map((section, index) => <div key={`${section.position}-${index}`} draggable onDragStart={() => setDraggedSectionIndex(index)} onDragOver={(event) => event.preventDefault()} onDrop={() => { if (draggedSectionIndex !== null && draggedSectionIndex !== index) reorderSections(draggedSectionIndex, index); setDraggedSectionIndex(null); }} onDragEnd={() => setDraggedSectionIndex(null)} className={`border border-black p-4 transition-opacity ${draggedSectionIndex === index ? "opacity-40" : ""}`}><div className="mb-4 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><button type="button" className="cursor-grab text-neutral-500 active:cursor-grabbing" aria-label={`Arrastar bloco ${index + 1}`}><GripVertical size={17} /></button><span className="font-mono text-[10px] text-[#f0372f]">{String(index + 1).padStart(2, "0")}</span><div className="relative"><select value={section.type} onChange={(event) => updateSection(index, { type: event.target.value as EditorSection["type"], heading: event.target.value === "chapter" ? section.heading || "Novo capítulo" : null })} className="appearance-none border-b border-black bg-white py-1 pr-6 text-[10px] font-bold uppercase tracking-[0.1em] outline-none"><option value="paragraph">Texto</option><option value="chapter">Capítulo</option><option value="quote">Citação</option></select><ChevronDown size={12} className="pointer-events-none absolute right-1 top-1.5" /></div></div><button onClick={() => removeSection(index)} className="text-neutral-500 hover:text-[#f0372f]" aria-label="Eliminar bloco"><Trash2 size={15} /></button></div>{section.type === "chapter" && <Input value={section.heading ?? ""} onChange={(event) => updateSection(index, { heading: event.target.value })} className="editor-input mb-3 font-bold" placeholder="Título do capítulo" />}<Textarea value={section.body ?? ""} onChange={(event) => updateSection(index, { body: event.target.value })} className="editor-input min-h-32" placeholder={section.type === "quote" ? "Uma ideia para destacar…" : "Escreva o texto deste bloco…"} /><Input value={section.caption ?? ""} onChange={(event) => updateSection(index, { caption: event.target.value })} className="editor-input mt-3 font-mono text-[10px]" placeholder={section.type === "quote" ? "Fonte ou nota" : "Nota opcional"} /></div>) : <div className="border border-dashed border-black p-7"><p className="font-mono text-[11px] uppercase tracking-[0.1em] text-neutral-500">Adicione texto, capítulos ou citações para construir o ritmo da leitura.</p></div>}</div></section>
+      <section className="editor-panel"><div className="editor-panel-heading"><span>03</span><h2>Estrutura de leitura</h2><div className="ml-auto flex gap-2"><Button onClick={() => addSection("paragraph")} variant="outline" className="editor-add"><Plus size={13} /> Texto</Button><Button onClick={() => addSection("chapter")} variant="outline" className="editor-add"><Plus size={13} /> Capítulo</Button><Button onClick={() => addSection("quote")} variant="outline" className="editor-add"><Plus size={13} /> Citação</Button><Button onClick={() => addSection("suggested")} variant="outline" className="editor-add"><Plus size={13} /> Sugestões</Button></div></div><p className="mb-4 font-mono text-[10px] uppercase tracking-[0.1em] text-neutral-500">Arraste o ícone à esquerda para ordenar os blocos.</p><div className="space-y-4">{sections.length ? sections.map((section, index) => <div key={`${section.position}-${index}`} draggable onDragStart={() => setDraggedSectionIndex(index)} onDragOver={(event) => event.preventDefault()} onDrop={() => { if (draggedSectionIndex !== null && draggedSectionIndex !== index) reorderSections(draggedSectionIndex, index); setDraggedSectionIndex(null); }} onDragEnd={() => setDraggedSectionIndex(null)} className={`border border-black p-4 transition-opacity ${draggedSectionIndex === index ? "opacity-40" : ""}`}><div className="mb-4 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><button type="button" className="cursor-grab text-neutral-500 active:cursor-grabbing" aria-label={`Arrastar bloco ${index + 1}`}><GripVertical size={17} /></button><span className="font-mono text-[10px] text-[#f0372f]">{String(index + 1).padStart(2, "0")}</span><div className="relative"><select value={section.type} onChange={(event) => updateSection(index, { type: event.target.value as EditorSection["type"], heading: event.target.value === "chapter" ? section.heading || "Novo capítulo" : null })} className="appearance-none border-b border-black bg-white py-1 pr-6 text-[10px] font-bold uppercase tracking-[0.1em] outline-none"><option value="paragraph">Texto</option><option value="chapter">Capítulo</option><option value="quote">Citação</option><option value="suggested">Sugestões</option></select><ChevronDown size={12} className="pointer-events-none absolute right-1 top-1.5" /></div></div><button onClick={() => removeSection(index)} className="text-neutral-500 hover:text-[#f0372f]" aria-label="Eliminar bloco"><Trash2 size={15} /></button></div>{(section.type === "chapter" || section.type === "suggested") && <Input value={section.heading ?? ""} onChange={(event) => updateSection(index, { heading: event.target.value })} className="editor-input mb-3 font-bold" placeholder={section.type === "chapter" ? "Título do capítulo" : 'Texto do rótulo (por omissão "Também pode ler")'} />}{section.type === "suggested" ? <SuggestedArticlesPicker section={section} onChange={(body) => updateSection(index, { body })} allArticles={allArticles} excludeId={article.id} /> : <><Textarea value={section.body ?? ""} onChange={(event) => updateSection(index, { body: event.target.value })} className="editor-input min-h-32" placeholder={section.type === "quote" ? "Uma ideia para destacar…" : "Escreva o texto deste bloco…"} /><Input value={section.caption ?? ""} onChange={(event) => updateSection(index, { caption: event.target.value })} className="editor-input mt-3 font-mono text-[10px]" placeholder={section.type === "quote" ? "Fonte ou nota" : "Nota opcional"} /></>}</div>) : <div className="border border-dashed border-black p-7"><p className="font-mono text-[11px] uppercase tracking-[0.1em] text-neutral-500">Adicione texto, capítulos ou citações para construir o ritmo da leitura.</p></div>}</div></section>
 
       <section className="editor-panel"><div className="editor-panel-heading"><span>04</span><h2>Galeria do artigo</h2><label className={`ml-auto ${images.length >= 10 ? "pointer-events-none opacity-40" : ""}`}><span className="editor-add inline-flex"><Upload size={13} /> {uploading ? "A preparar…" : "Adicionar imagens"}</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void handleImageUpload(event, "gallery")} className="sr-only" disabled={images.length >= 10 || uploading} /></label></div><p className="mb-5 font-mono text-[10px] uppercase tracking-[0.1em] text-neutral-500">{images.length}/10 imagens de destaque · Arraste para ordenar. Clique na imagem no artigo para abrir em ecrã inteiro. Para galerias maiores, use a <Link href="/redacao/multimedia" className="underline">multimédia</Link>.</p>{images.length ? <div className="grid gap-4 sm:grid-cols-2">{images.map((image, index) => <div key={`${image.url}-${index}`} draggable onDragStart={() => setDraggedImageIndex(index)} onDragOver={(event) => event.preventDefault()} onDrop={() => { if (draggedImageIndex !== null && draggedImageIndex !== index) reorderImages(draggedImageIndex, index); setDraggedImageIndex(null); }} onDragEnd={() => setDraggedImageIndex(null)} className={`border border-black p-3 transition-opacity ${draggedImageIndex === index ? "opacity-40" : ""}`}><div className="relative aspect-[4/3] overflow-hidden bg-neutral-100"><img src={image.url} alt="Pré-visualização" className="h-full w-full object-cover" /><button type="button" className="absolute left-2 top-2 flex h-7 w-7 cursor-grab items-center justify-center bg-white text-black active:cursor-grabbing" aria-label={`Arrastar imagem ${index + 1}`}><GripVertical size={15} /></button><button onClick={() => removeImage(index)} className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center bg-white text-black hover:bg-[#f0372f] hover:text-white" aria-label="Remover imagem"><X size={15} /></button><span className="absolute bottom-0 left-0 bg-white px-2 py-1 font-mono text-[10px] font-bold">{String(index + 1).padStart(2, "0")}</span></div><Input value={image.altText ?? ""} onChange={(event) => updateImage(index, { altText: event.target.value })} className="editor-input mt-3 text-xs" placeholder="Descrição alternativa" /><Textarea value={image.caption ?? ""} onChange={(event) => updateImage(index, { caption: event.target.value })} className="editor-input mt-3 min-h-20 text-xs" placeholder="Legenda da fotografia" /></div>)}</div> : <div className="border border-dashed border-black p-7"><p className="font-mono text-[11px] uppercase tracking-[0.1em] text-neutral-500">O artigo aceita até dez imagens de destaque, com texto alternativo e legenda individuais.</p></div>}</section>
 

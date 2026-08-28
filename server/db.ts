@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { articleCategories, articleImages, articles, articleSections, categories, InsertUser, magazineIssues, siteGalleryImages, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -90,7 +90,7 @@ export async function getUserByOpenId(openId: string) {
 }
 
 type SectionInput = {
-  type: "paragraph" | "chapter" | "quote";
+  type: "paragraph" | "chapter" | "quote" | "suggested";
   heading?: string | null;
   body?: string | null;
   caption?: string | null;
@@ -143,6 +143,47 @@ export async function findArticleByTitle(title: string, ignoreId?: number) {
   return article;
 }
 
+// Card-shaped summaries for "suggested" sections — only published articles,
+// in the editor's chosen order. Not the full getArticleWithContent() payload
+// (no sections/images), since this only needs to render an ArticleCard.
+async function getArticleCardSummaries(ids: number[]) {
+  if (!ids.length) return [];
+  const db = await requireDb();
+
+  const rows = await db.select({
+    id: articles.id,
+    title: articles.title,
+    slug: articles.slug,
+    deck: articles.deck,
+    coverImageUrl: articles.coverImageUrl,
+    authorName: articles.authorName,
+    publishedAt: articles.publishedAt,
+    createdAt: articles.createdAt,
+  }).from(articles).where(and(inArray(articles.id, ids), eq(articles.status, "published")));
+
+  const categoryRows = await db.select({
+    articleId: articleCategories.articleId,
+    id: categories.id,
+    name: categories.name,
+    slug: categories.slug,
+    kind: categories.kind,
+  }).from(articleCategories)
+    .innerJoin(categories, eq(articleCategories.categoryId, categories.id))
+    .where(inArray(articleCategories.articleId, ids))
+    .orderBy(sql`CASE WHEN ${categories.kind} = 'marca' THEN 0 ELSE 1 END`, asc(categories.name));
+
+  const byId = new Map(rows.map((row) => [row.id, {
+    ...row,
+    categories: categoryRows.filter((category) => category.articleId === row.id).map(({ id: categoryId, name, slug }) => ({ id: categoryId, name, slug })),
+  }]));
+
+  return ids.map((articleId) => byId.get(articleId)).filter((row): row is NonNullable<typeof row> => Boolean(row));
+}
+
+function parseSuggestedArticleIds(body: string | null): number[] {
+  return (body ?? "").split(",").map((value) => Number(value.trim())).filter((value) => Number.isInteger(value) && value > 0);
+}
+
 export async function getArticleWithContent(id: number) {
   const db = await requireDb();
   const article = await findArticleById(id);
@@ -158,7 +199,13 @@ export async function getArticleWithContent(id: number) {
       .orderBy(sql`CASE WHEN ${categories.kind} = 'marca' THEN 0 ELSE 1 END`, asc(categories.name)),
   ]);
 
-  return { ...article, sections: sectionRows, images: imageRows, categories: categoryRows };
+  const sections = await Promise.all(sectionRows.map(async (section) => {
+    if (section.type !== "suggested") return { ...section, suggestedArticles: null };
+    const suggestedArticles = await getArticleCardSummaries(parseSuggestedArticleIds(section.body));
+    return { ...section, suggestedArticles };
+  }));
+
+  return { ...article, sections, images: imageRows, categories: categoryRows };
 }
 
 async function hydrateArticles(ids: number[]) {

@@ -67,28 +67,32 @@ export function registerOAuthRoutes(app: Express) {
   // Local-dev-only shortcut: the real Manus OAuth flow can't complete against
   // http://localhost (redirect URI isn't registered there). Never reachable
   // once NODE_ENV=production, so it can't leak into a real deployment.
+  //
+  // ?role=user logs in as a synthetic non-admin account instead of the site
+  // owner — used by the Playwright suite to verify admin-only guards actually
+  // reject a real authenticated-but-not-admin session, not just "no session".
   if (!ENV.isProduction) {
     app.get("/api/dev/login", async (req: Request, res: Response) => {
-      if (!ENV.ownerOpenId) {
+      const asTestUser = req.query.role === "user";
+      const openId = asTestUser ? "dev-test-user" : ENV.ownerOpenId;
+      const name = asTestUser ? "Utilizador de Teste" : "Pedro Félix";
+
+      if (!openId) {
         res.status(500).json({ error: "OWNER_OPEN_ID not configured" });
         return;
       }
 
       try {
-        await db.upsertUser({
-          openId: ENV.ownerOpenId,
-          name: "Pedro Félix",
-          lastSignedIn: new Date(),
-        });
+        await db.upsertUser({ openId, name, lastSignedIn: new Date() });
 
-        const sessionToken = await sdk.createSessionToken(ENV.ownerOpenId, {
-          name: "Pedro Félix",
+        const sessionToken = await sdk.createSessionToken(openId, {
+          name,
           expiresInMs: ONE_YEAR_MS,
         });
 
         const cookieOptions = getSessionCookieOptions(req);
         res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-        res.redirect(302, "/redacao");
+        res.redirect(302, asTestUser ? "/" : "/redacao");
       } catch (error) {
         console.error("[Dev login] Failed", error);
         res.status(500).json({ error: "Dev login failed" });

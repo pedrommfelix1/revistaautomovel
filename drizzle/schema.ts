@@ -61,8 +61,9 @@ export const articles = mysqlTable("articles", {
 export const articleSections = mysqlTable("articleSections", {
   id: int("id").autoincrement().primaryKey(),
   articleId: int("articleId").notNull().references(() => articles.id, { onDelete: "cascade" }),
-  type: mysqlEnum("type", ["paragraph", "chapter", "quote"]).notNull(),
+  type: mysqlEnum("type", ["paragraph", "chapter", "quote", "suggested"]).notNull(),
   heading: varchar("heading", { length: 220 }),
+  /** For type "suggested": comma-separated article ids to show as inline suggested reads. */
   body: text("body"),
   caption: text("caption"),
   position: int("position").notNull(),

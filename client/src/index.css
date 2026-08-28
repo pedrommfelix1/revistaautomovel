@@ -184,8 +184,8 @@
   .nav-link:hover, .footer-link:hover { color: #f0372f; }
   .mobile-nav-link { display: flex; align-items: center; gap: 1rem; border-bottom: 1px solid #171717; padding: 0.9rem 0; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
   .home-masthead { display: grid; gap: 2.5rem; }
-  .article-title-area h1 { max-width: 900px; font-size: clamp(3.35rem, 8vw, 8.4rem); font-weight: 700; line-height: 0.82; letter-spacing: -0.095em; overflow-wrap: anywhere; word-break: break-word; }
-  .article-deck { max-width: 47rem; margin-top: 1.8rem; font-size: clamp(1.15rem, 2vw, 1.45rem); line-height: 1.42; color: #555; overflow-wrap: anywhere; word-break: break-word; }
+  .article-title-area h1 { max-width: 900px; font-size: clamp(2.6rem, 6vw, 6rem); font-weight: 700; line-height: 0.88; letter-spacing: -0.03em; overflow-wrap: normal; word-break: normal; }
+  .article-deck { max-width: 47rem; margin-top: 1.8rem; font-size: clamp(1.15rem, 2vw, 1.45rem); font-weight: 700; line-height: 1.42; color: #555; overflow-wrap: anywhere; word-break: break-word; }
   .article-layout { width: min(100% - 2.5rem, 1400px); margin: 2rem auto 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3rem; }
   .article-copy { min-width: 0; }
   .article-copy p { font-size: clamp(1.16rem, 2.05vw, 1.43rem); line-height: 1.7; letter-spacing: -0.02em; overflow-wrap: anywhere; word-break: break-word; hyphens: auto; }
@@ -204,8 +204,15 @@
   .article-copy blockquote { overflow-wrap: anywhere; word-break: break-word; }
   .article-paragraph { margin-bottom: 1.75rem; }
   .article-caption, .article-cover-area figcaption { margin-top: 0.55rem; font-family: "DM Mono", monospace; font-size: 0.65rem !important; line-height: 1.5 !important; letter-spacing: 0.02em !important; color: #666; overflow-wrap: anywhere; word-break: break-word; }
-  .drop-cap { font-weight: 700; }
   .drop-cap::first-letter { float: left; margin: 0.03em 0.12em 0 0; color: #f0372f; font-family: "Space Grotesk", sans-serif; font-size: 4.9em; font-weight: 700; line-height: 0.72; }
+  .article-suggested { margin: 2.6rem 0; padding: 1.5rem; border: 2px solid #111; background: #f7f7f5; }
+  .article-suggested-label { display: flex; align-items: center; gap: 0.6rem; font-family: "DM Mono", monospace; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+  .article-suggested-label::before { content: ""; width: 0.6rem; height: 0.6rem; background: #f0372f; flex-shrink: 0; }
+  .article-suggested-grid { margin-top: 1.1rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; }
+  .article-suggested-card { display: block; }
+  .article-suggested-card img { aspect-ratio: 4/3; width: 100%; object-fit: cover; background: #e9e9e7; }
+  .article-suggested-title { display: block; margin-top: 0.55rem; font-size: 0.92rem; font-weight: 700; line-height: 1.3; letter-spacing: -0.01em; }
+  .article-suggested-card:hover .article-suggested-title { color: #f0372f; }
   .article-gallery-wrap { width: min(100% - 2.5rem, 1240px); margin-inline: auto; }
   .gallery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; }
   .gallery-grid > :first-child { grid-column: span 2; aspect-ratio: 16/8; }
@@ -223,11 +230,28 @@
 }
 
 @media (min-width: 1024px) {
-  .article-layout { grid-template-columns: minmax(0, 1fr) minmax(340px, 440px); grid-template-areas: "title sidebar" "sections sidebar"; align-items: start; }
+  .article-layout { grid-template-columns: minmax(0, 1fr) minmax(440px, 58%); grid-template-areas: "title sidebar" "sections sidebar"; align-items: start; column-gap: 3rem; }
   .article-title-area { grid-area: title; }
   .article-copy { grid-area: sections; }
   .article-sidebar { grid-area: sidebar; position: sticky; top: 2rem; }
+
+  /* "Modo revista" — a large photo dominates the left rail (like a print
+     spread), cycling through the article's gallery as the reader scrolls
+     (see ArticleSections' IntersectionObserver), and the copy runs narrower
+     and more compact alongside it, instead of the default wide-copy /
+     photo-on-the-right reading layout. */
+  .article-layout--magazine { grid-template-columns: minmax(440px, 58%) minmax(0, 1fr); grid-template-areas: "sidebar title" "sidebar sections"; column-gap: 3rem; }
+  .article-layout--magazine .article-title-area h1 { max-width: none; font-size: clamp(2rem, 3.6vw, 3.6rem); }
+  .article-layout--magazine .article-copy { max-width: 32rem; }
+  .article-layout--magazine .article-copy p { font-size: clamp(0.9rem, 1.05vw, 1rem); line-height: 1.55; }
+  .article-layout--magazine .article-copy p + p { margin-top: 1.05rem; }
+  .article-layout--magazine .article-chapter { margin-bottom: 1.6rem; }
+  .article-layout--magazine .article-chapter h2 { font-size: clamp(1.25rem, 1.7vw, 1.55rem); }
+  .article-layout--magazine .drop-cap::first-letter { font-size: 3.6em; }
 }
+
+.article-cover-fade { animation: article-cover-fade-in 450ms ease; }
+@keyframes article-cover-fade-in { from { opacity: 0; } to { opacity: 1; } }
 
 @media (prefers-reduced-motion: no-preference) {
   a, button { transition: transform 160ms var(--ease-out), background-color 160ms var(--ease-out), color 160ms var(--ease-out), border-color 160ms var(--ease-out); }

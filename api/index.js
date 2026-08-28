@@ -7,7 +7,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import express from "express";
 
 // server/db.ts
-import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 
 // drizzle/schema.ts
@@ -62,8 +62,9 @@ var articles = mysqlTable("articles", {
 var articleSections = mysqlTable("articleSections", {
   id: int("id").autoincrement().primaryKey(),
   articleId: int("articleId").notNull().references(() => articles.id, { onDelete: "cascade" }),
-  type: mysqlEnum("type", ["paragraph", "chapter", "quote"]).notNull(),
+  type: mysqlEnum("type", ["paragraph", "chapter", "quote", "suggested"]).notNull(),
   heading: varchar("heading", { length: 220 }),
+  /** For type "suggested": comma-separated article ids to show as inline suggested reads. */
   body: text("body"),
   caption: text("caption"),
   position: int("position").notNull()
@@ -218,6 +219,35 @@ async function findArticleByTitle(title, ignoreId) {
   const [article] = await db.select().from(articles).where(and(...conditions)).limit(1);
   return article;
 }
+async function getArticleCardSummaries(ids) {
+  if (!ids.length) return [];
+  const db = await requireDb();
+  const rows = await db.select({
+    id: articles.id,
+    title: articles.title,
+    slug: articles.slug,
+    deck: articles.deck,
+    coverImageUrl: articles.coverImageUrl,
+    authorName: articles.authorName,
+    publishedAt: articles.publishedAt,
+    createdAt: articles.createdAt
+  }).from(articles).where(and(inArray(articles.id, ids), eq(articles.status, "published")));
+  const categoryRows = await db.select({
+    articleId: articleCategories.articleId,
+    id: categories.id,
+    name: categories.name,
+    slug: categories.slug,
+    kind: categories.kind
+  }).from(articleCategories).innerJoin(categories, eq(articleCategories.categoryId, categories.id)).where(inArray(articleCategories.articleId, ids)).orderBy(sql`CASE WHEN ${categories.kind} = 'marca' THEN 0 ELSE 1 END`, asc(categories.name));
+  const byId = new Map(rows.map((row) => [row.id, {
+    ...row,
+    categories: categoryRows.filter((category) => category.articleId === row.id).map(({ id: categoryId, name, slug }) => ({ id: categoryId, name, slug }))
+  }]));
+  return ids.map((articleId) => byId.get(articleId)).filter((row) => Boolean(row));
+}
+function parseSuggestedArticleIds(body) {
+  return (body ?? "").split(",").map((value) => Number(value.trim())).filter((value) => Number.isInteger(value) && value > 0);
+}
 async function getArticleWithContent(id) {
   const db = await requireDb();
   const article = await findArticleById(id);
@@ -227,7 +257,12 @@ async function getArticleWithContent(id) {
     db.select().from(articleImages).where(eq(articleImages.articleId, id)).orderBy(asc(articleImages.position)),
     db.select({ id: categories.id, name: categories.name, slug: categories.slug, description: categories.description, kind: categories.kind }).from(articleCategories).innerJoin(categories, eq(articleCategories.categoryId, categories.id)).where(eq(articleCategories.articleId, id)).orderBy(sql`CASE WHEN ${categories.kind} = 'marca' THEN 0 ELSE 1 END`, asc(categories.name))
   ]);
-  return { ...article, sections: sectionRows, images: imageRows, categories: categoryRows };
+  const sections = await Promise.all(sectionRows.map(async (section) => {
+    if (section.type !== "suggested") return { ...section, suggestedArticles: null };
+    const suggestedArticles = await getArticleCardSummaries(parseSuggestedArticleIds(section.body));
+    return { ...section, suggestedArticles };
+  }));
+  return { ...article, sections, images: imageRows, categories: categoryRows };
 }
 async function hydrateArticles(ids) {
   const hydrated = await Promise.all(ids.map((id) => getArticleWithContent(id)));
@@ -884,23 +919,22 @@ function registerOAuthRoutes(app2) {
   });
   if (!ENV.isProduction) {
     app2.get("/api/dev/login", async (req, res) => {
-      if (!ENV.ownerOpenId) {
+      const asTestUser = req.query.role === "user";
+      const openId = asTestUser ? "dev-test-user" : ENV.ownerOpenId;
+      const name = asTestUser ? "Utilizador de Teste" : "Pedro F\xE9lix";
+      if (!openId) {
         res.status(500).json({ error: "OWNER_OPEN_ID not configured" });
         return;
       }
       try {
-        await upsertUser({
-          openId: ENV.ownerOpenId,
-          name: "Pedro F\xE9lix",
-          lastSignedIn: /* @__PURE__ */ new Date()
-        });
-        const sessionToken = await sdk.createSessionToken(ENV.ownerOpenId, {
-          name: "Pedro F\xE9lix",
+        await upsertUser({ openId, name, lastSignedIn: /* @__PURE__ */ new Date() });
+        const sessionToken = await sdk.createSessionToken(openId, {
+          name,
           expiresInMs: ONE_YEAR_MS
         });
         const cookieOptions = getSessionCookieOptions(req);
         res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-        res.redirect(302, "/redacao");
+        res.redirect(302, asTestUser ? "/" : "/redacao");
       } catch (error) {
         console.error("[Dev login] Failed", error);
         res.status(500).json({ error: "Dev login failed" });
@@ -1125,7 +1159,7 @@ var systemRouter = router({
 import { TRPCError as TRPCError3 } from "@trpc/server";
 import { z as z2 } from "zod";
 var sectionInput = z2.object({
-  type: z2.enum(["paragraph", "chapter", "quote"]),
+  type: z2.enum(["paragraph", "chapter", "quote", "suggested"]),
   heading: z2.string().max(220).nullable().optional(),
   body: z2.string().max(2e4).nullable().optional(),
   caption: z2.string().max(500).nullable().optional(),

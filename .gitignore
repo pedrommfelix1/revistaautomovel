@@ -114,3 +114,8 @@ client/public/__manus__/version.json
 .project-config.json
 
 .vercel
+
+# Playwright
+/test-results/
+/playwright-report/
+/tests/.auth/
