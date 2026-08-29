@@ -53,9 +53,9 @@ function RecentArticlesList({ items }: { items: { id: number; slug: string; titl
     <div>
       <h2 className="article-sidebar-heading">Artigos recentes</h2>
       <ol className="article-recent-list">
-        {items.map((item, index) => (
+        {items.map((item) => (
           <li key={item.id} className="article-recent-item">
-            <span className="article-recent-index">{index + 1}</span>
+            <span className="article-recent-marker" />
             <Link href={`/artigo/${item.slug}`} className="article-recent-title no-underline">{item.title}</Link>
           </li>
         ))}

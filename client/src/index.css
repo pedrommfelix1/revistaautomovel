@@ -183,6 +183,7 @@
   .nav-link { transition: color 160ms var(--ease-out); }
   .nav-link:hover, .footer-link:hover { color: #f0372f; }
   .mobile-nav-link { display: flex; align-items: center; gap: 1rem; border-bottom: 1px solid #171717; padding: 0.9rem 0; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+  .mobile-nav-marker { width: 0.55rem; height: 0.55rem; background: #f0372f; flex-shrink: 0; }
   .home-masthead { display: grid; gap: 2.5rem; }
   .article-title-area h1 { max-width: 900px; font-size: clamp(2.6rem, 6vw, 6rem); font-weight: 700; line-height: 0.88; letter-spacing: -0.03em; overflow-wrap: normal; word-break: normal; }
   .article-deck { max-width: 47rem; margin-top: 1.8rem; font-size: clamp(1.15rem, 2vw, 1.45rem); font-weight: 700; line-height: 1.42; color: #555; overflow-wrap: anywhere; word-break: break-word; }
@@ -193,8 +194,8 @@
   .article-sidebar { min-width: 0; }
   .article-sidebar-heading { border-bottom: 2px solid #111; padding-bottom: 0.6rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
   .article-recent-list { margin-top: 1.3rem; display: grid; gap: 1.3rem; }
-  .article-recent-item { display: flex; gap: 0.9rem; align-items: baseline; }
-  .article-recent-index { font-family: "Space Grotesk", sans-serif; font-size: 1.3rem; font-weight: 700; font-style: italic; color: #b3b3b3; flex-shrink: 0; }
+  .article-recent-item { display: flex; gap: 0.9rem; align-items: center; }
+  .article-recent-marker { width: 0.6rem; height: 0.6rem; background: #f0372f; flex-shrink: 0; }
   .article-recent-title { font-size: 1.05rem; font-weight: 700; line-height: 1.35; letter-spacing: -0.01em; color: #111; overflow-wrap: anywhere; word-break: break-word; }
   .article-recent-title:hover { color: #f0372f; }
   .article-chapter { margin-bottom: 2.3rem; }

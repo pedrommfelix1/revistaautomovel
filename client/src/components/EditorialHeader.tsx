@@ -45,12 +45,12 @@ export function EditorialHeader() {
       {open && (
         <nav aria-label="Navegação móvel" className="border-t border-black bg-white px-5 py-5 md:hidden">
           <div className="editorial-shell grid gap-1 px-0">
-            {mainTabs.map((tab, index) => (
+            {mainTabs.map((tab) => (
               <Link key={tab.href} onClick={() => setOpen(false)} href={tab.href} className="mobile-nav-link">
-                <span className="font-mono text-[10px] text-[#f0372f]">0{index + 1}</span>{tab.label}
+                <span className="mobile-nav-marker" />{tab.label}
               </Link>
             ))}
-            <Link onClick={() => setOpen(false)} href="/redacao" className="mobile-nav-link"><span className="font-mono text-[10px] text-[#f0372f]">0{mainTabs.length + 1}</span>Redação</Link>
+            <Link onClick={() => setOpen(false)} href="/redacao" className="mobile-nav-link"><span className="mobile-nav-marker" />Redação</Link>
           </div>
         </nav>
       )}
