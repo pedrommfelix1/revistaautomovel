@@ -164,8 +164,8 @@ function ArticleSections({ article, galleryCount, onActiveImageChange }: { artic
             <aside key={section.id} className="article-suggested">
               <p className="article-suggested-label">{section.heading || "Também pode ler"}</p>
               <div className="article-suggested-grid">
-                {items.map((item) => (
-                  <ArticleCard key={item.id} article={item} compact />
+                {items.map((item, itemIndex) => (
+                  <ArticleCard key={item.id} article={item} index={itemIndex} />
                 ))}
               </div>
             </aside>
@@ -223,7 +223,7 @@ export default function Article() {
 
           <div className={`article-layout mt-8 border-t-2 border-black pt-5 sm:mt-11 sm:pt-7 ${magazine ? "article-layout--magazine" : ""}`}>
             <div className="article-title-area">
-              <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-bold uppercase tracking-[0.14em]"><span className="text-[#f0372f]">{article.categories.map((category) => category.name).join(" / ") || "Editorial"}</span><span className="text-neutral-500">N.º {String(article.id).padStart(2, "0")}</span></div>
+              <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-bold uppercase tracking-[0.14em]">{article.categories.length > 0 && <span className="text-[#f0372f]">{article.categories.map((category) => category.name).join(" / ")}</span>}<span className="text-neutral-500">N.º {String(article.id).padStart(2, "0")}</span></div>
               <h1>{article.articleTitle || article.title}</h1>
               {article.deck && <p className="article-deck">{article.deck}</p>}
               <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-black pt-4 text-[10px] font-bold uppercase tracking-[0.11em] text-neutral-600">
