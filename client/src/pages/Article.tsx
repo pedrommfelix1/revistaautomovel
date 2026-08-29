@@ -3,6 +3,7 @@ import { ArrowLeft, Clock3, Newspaper, Search, Share2 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import type { AppRouter } from "../../../server/routers";
+import { ArticleCard } from "@/components/ArticleCard";
 import { EditorialFooter } from "@/components/EditorialFooter";
 import { EditorialHeader } from "@/components/EditorialHeader";
 import { PhotoGallery } from "@/components/PhotoGallery";
@@ -74,7 +75,7 @@ function ArticleSidebar({ article, magazine, activeImage }: { article: ArticleDa
     if (next.length >= 2) setLocation(`/pesquisa?q=${encodeURIComponent(next)}`);
   }
 
-  const displayImage = magazine && activeImage ? activeImage : article.coverImageUrl ? { url: article.coverImageUrl, caption: article.coverImageCaption } : null;
+  const displayImage = activeImage ?? (article.coverImageUrl ? { url: article.coverImageUrl, caption: article.coverImageCaption } : null);
 
   return (
     <aside className="article-sidebar">
@@ -92,18 +93,21 @@ function ArticleSidebar({ article, magazine, activeImage }: { article: ArticleDa
         </form>
 
         {/* On mobile "Artigos recentes" moves to the bottom of the page (see ArticleRecentMobile);
-            only the sticky desktop rail shows it bundled with the photo and search. */}
-        <div className="mt-9 hidden lg:block">
-          <RecentArticlesList items={items} />
-        </div>
+            only the sticky desktop rail shows it bundled with the photo and search. Hidden
+            entirely in "modo revista", which keeps the rail focused on the photo. */}
+        {!magazine && (
+          <div className="mt-9 hidden lg:block">
+            <RecentArticlesList items={items} />
+          </div>
+        )}
       </div>
     </aside>
   );
 }
 
-function ArticleRecentMobile({ article }: { article: ArticleData }) {
+function ArticleRecentMobile({ article, magazine }: { article: ArticleData; magazine: boolean }) {
   const items = useRecentArticles(article.id);
-  if (!items.length) return null;
+  if (magazine || !items.length) return null;
   return (
     <div className="editorial-shell mt-16 border-t-2 border-black pt-7 lg:hidden">
       <RecentArticlesList items={items} />
@@ -111,17 +115,17 @@ function ArticleRecentMobile({ article }: { article: ArticleData }) {
   );
 }
 
-function ArticleSections({ article, magazine, galleryCount, onActiveImageChange }: { article: ArticleData; magazine: boolean; galleryCount: number; onActiveImageChange: (index: number) => void }) {
+function ArticleSections({ article, galleryCount, onActiveImageChange }: { article: ArticleData; galleryCount: number; onActiveImageChange: (index: number) => void }) {
   const openingIndex = article.sections.findIndex((section) => section.type !== "suggested" && Boolean(section.body));
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // In "modo revista", the sticky photo cycles through the article's gallery
-  // as the reader scrolls. This tracks continuous scroll progress through the
-  // whole body (not per-section) so it steps through every image evenly —
-  // with only a handful of sections but many more gallery photos, mapping by
-  // section index alone would skip most of them.
+  // The sticky photo cycles through the article's gallery as the reader
+  // scrolls, in both reading and "modo revista". This tracks continuous
+  // scroll progress through the whole body (not per-section) so it steps
+  // through every image evenly — with only a handful of sections but many
+  // more gallery photos, mapping by section index alone would skip most of them.
   useEffect(() => {
-    if (!magazine || galleryCount <= 1) return;
+    if (galleryCount <= 1) return;
     const container = containerRef.current;
     if (!container) return;
 
@@ -148,7 +152,7 @@ function ArticleSections({ article, magazine, galleryCount, onActiveImageChange 
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, [magazine, galleryCount, onActiveImageChange]);
+  }, [galleryCount, onActiveImageChange]);
 
   return (
     <div className="article-copy" ref={containerRef}>
@@ -161,10 +165,7 @@ function ArticleSections({ article, magazine, galleryCount, onActiveImageChange 
               <p className="article-suggested-label">{section.heading || "Também pode ler"}</p>
               <div className="article-suggested-grid">
                 {items.map((item) => (
-                  <Link key={item.id} href={`/artigo/${item.slug}`} className="article-suggested-card no-underline text-black">
-                    {item.coverImageUrl ? <img src={item.coverImageUrl} alt="" /> : <div className="aspect-[4/3] w-full bg-[#e9e9e7]" />}
-                    <span className="article-suggested-title">{item.title}</span>
-                  </Link>
+                  <ArticleCard key={item.id} article={item} compact />
                 ))}
               </div>
             </aside>
@@ -234,12 +235,12 @@ export default function Article() {
             </div>
 
             <ArticleSidebar article={article} magazine={magazine} activeImage={galleryFrames[activeImageIndex] ?? null} />
-            <ArticleSections article={article} magazine={magazine} galleryCount={galleryFrames.length} onActiveImageChange={handleActiveImageChange} />
+            <ArticleSections article={article} galleryCount={galleryFrames.length} onActiveImageChange={handleActiveImageChange} />
           </div>
         </div>
 
         <div className="article-gallery-wrap"><PhotoGallery images={article.images} /></div>
-        <ArticleRecentMobile article={article} />
+        <ArticleRecentMobile article={article} magazine={magazine} />
       </main>
       <EditorialFooter />
     </div>
