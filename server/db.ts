@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { articleCategories, articleImages, articles, articleSections, categories, InsertUser, loginAttempts, magazineIssues, siteGalleryImages, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -283,7 +283,10 @@ export async function searchPublishedArticles(query: string) {
   const db = await requireDb();
   const phrase = query.trim();
   if (phrase.length < 2) return [];
-  const pattern = `%${phrase}%`;
+  // Text columns use utf8mb4_bin (case-sensitive) collation, so a plain LIKE
+  // would only match "Passat" and never "passat". Lowering both sides makes
+  // the match case-insensitive regardless of column collation.
+  const pattern = `%${phrase.toLowerCase()}%`;
   const rows = await db.select({ id: articles.id })
     .from(articles)
     .leftJoin(articleCategories, eq(articles.id, articleCategories.articleId))
@@ -291,10 +294,10 @@ export async function searchPublishedArticles(query: string) {
     .where(and(
       eq(articles.status, "published"),
       or(
-        like(articles.title, pattern),
-        like(articles.deck, pattern),
-        like(articles.authorName, pattern),
-        like(categories.name, pattern),
+        sql`LOWER(${articles.title}) LIKE ${pattern}`,
+        sql`LOWER(${articles.deck}) LIKE ${pattern}`,
+        sql`LOWER(${articles.authorName}) LIKE ${pattern}`,
+        sql`LOWER(${categories.name}) LIKE ${pattern}`,
       ),
     ))
     .orderBy(desc(articles.publishedAt), desc(articles.createdAt));

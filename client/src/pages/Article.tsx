@@ -162,7 +162,6 @@ function ArticleSections({ article, galleryCount, onActiveImageChange }: { artic
           if (!items.length) return null;
           return (
             <aside key={section.id} className="article-suggested">
-              <p className="article-suggested-label">{section.heading || "Também pode ler"}</p>
               <div className="article-suggested-grid">
                 {items.map((item, itemIndex) => (
                   <ArticleCard key={item.id} article={item} index={itemIndex} />

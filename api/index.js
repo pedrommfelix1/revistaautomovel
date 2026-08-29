@@ -7,7 +7,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import express from "express";
 
 // server/db.ts
-import { and, asc, desc, eq, inArray, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 
 // drizzle/schema.ts
@@ -340,14 +340,14 @@ async function searchPublishedArticles(query) {
   const db = await requireDb();
   const phrase = query.trim();
   if (phrase.length < 2) return [];
-  const pattern = `%${phrase}%`;
+  const pattern = `%${phrase.toLowerCase()}%`;
   const rows = await db.select({ id: articles.id }).from(articles).leftJoin(articleCategories, eq(articles.id, articleCategories.articleId)).leftJoin(categories, eq(articleCategories.categoryId, categories.id)).where(and(
     eq(articles.status, "published"),
     or(
-      like(articles.title, pattern),
-      like(articles.deck, pattern),
-      like(articles.authorName, pattern),
-      like(categories.name, pattern)
+      sql`LOWER(${articles.title}) LIKE ${pattern}`,
+      sql`LOWER(${articles.deck}) LIKE ${pattern}`,
+      sql`LOWER(${articles.authorName}) LIKE ${pattern}`,
+      sql`LOWER(${categories.name}) LIKE ${pattern}`
     )
   )).orderBy(desc(articles.publishedAt), desc(articles.createdAt));
   return hydrateArticles(Array.from(new Set(rows.map((article) => article.id))).slice(0, 24));
