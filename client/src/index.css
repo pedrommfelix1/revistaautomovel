@@ -185,11 +185,13 @@
   .mobile-nav-link { display: flex; align-items: center; gap: 1rem; border-bottom: 1px solid #171717; padding: 0.9rem 0; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
   .mobile-nav-marker { width: 0.55rem; height: 0.55rem; background: #f0372f; flex-shrink: 0; }
   .home-masthead { display: grid; gap: 2.5rem; }
-  .article-title-area h1 { max-width: 900px; font-size: clamp(2.6rem, 6vw, 6rem); font-weight: 700; line-height: 0.88; letter-spacing: -0.03em; overflow-wrap: normal; word-break: normal; }
-  .article-deck { max-width: 47rem; margin-top: 1.8rem; font-size: clamp(1.15rem, 2vw, 1.45rem); font-weight: 700; line-height: 1.42; color: #555; overflow-wrap: anywhere; word-break: break-word; }
+  /* "Archivo" and "Inter" stand in for the client's DIN and Mini Pro until
+     those are licensed — swap the family names below once available. */
+  .article-title-area h1 { max-width: 900px; font-family: "Archivo", "DM Sans", sans-serif; font-size: clamp(2.6rem, 6vw, 6rem); font-weight: 700; line-height: 0.88; letter-spacing: -0.03em; overflow-wrap: normal; word-break: normal; }
+  .article-deck { max-width: 47rem; margin-top: 1.8rem; font-family: "Inter", "DM Sans", sans-serif; font-size: clamp(1.15rem, 2vw, 1.45rem); font-weight: 350; line-height: 1.42; color: #555; overflow-wrap: anywhere; word-break: break-word; }
   .article-layout { width: min(100% - 2.5rem, 1400px); margin: 2rem auto 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3rem; }
   .article-copy { min-width: 0; }
-  .article-copy p { font-size: clamp(1.16rem, 2.05vw, 1.43rem); line-height: 1.7; letter-spacing: -0.02em; overflow-wrap: anywhere; word-break: break-word; hyphens: auto; }
+  .article-copy p { font-family: "Inter", "DM Sans", sans-serif; font-weight: 400; font-size: clamp(1.16rem, 2.05vw, 1.43rem); line-height: 1.7; letter-spacing: -0.02em; overflow-wrap: anywhere; word-break: break-word; hyphens: auto; }
   .article-copy p + p { margin-top: 1.5rem; }
   .article-sidebar { min-width: 0; }
   .article-sidebar-heading { border-bottom: 2px solid #111; padding-bottom: 0.6rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
@@ -201,12 +203,12 @@
   .article-chapter { margin-bottom: 2.3rem; }
   .article-chapter-heading { position: relative; }
   .article-chapter-marker { position: absolute; top: 0.38em; left: -1.15rem; width: 0.7rem; height: 0.7rem; background: #f0372f; }
-  .article-chapter h2 { font-size: clamp(1.7rem, 3vw, 2.35rem); font-weight: 700; letter-spacing: -0.055em; line-height: 1; overflow-wrap: anywhere; word-break: break-word; }
+  .article-chapter h2 { font-family: "Archivo", "DM Sans", sans-serif; font-size: clamp(1.7rem, 3vw, 2.35rem); font-weight: 700; letter-spacing: -0.055em; line-height: 1; overflow-wrap: anywhere; word-break: break-word; }
   .article-copy blockquote { overflow-wrap: anywhere; word-break: break-word; }
   .article-paragraph { margin-bottom: 1.75rem; }
   .article-caption, .article-cover-area figcaption { margin-top: 0.55rem; font-family: "DM Mono", monospace; font-size: 0.65rem !important; line-height: 1.5 !important; letter-spacing: 0.02em !important; color: #666; overflow-wrap: anywhere; word-break: break-word; }
   .article-inline-figure { margin: 2rem 0; }
-  .drop-cap::first-letter { float: left; margin: 0.03em 0.12em 0 0; color: #f0372f; font-family: "Space Grotesk", sans-serif; font-size: 4.9em; font-weight: 700; line-height: 0.72; }
+  .drop-cap::first-letter { float: left; margin: 0.03em 0.12em 0 0; color: #f0372f; font-family: "Archivo", sans-serif; font-size: 9.1em; font-weight: 700; line-height: 0.72; }
   .article-suggested { margin: 2.6rem 0; padding: 1.5rem; border: 2px solid #111; background: #f7f7f5; width: fit-content; max-width: 100%; }
   .article-suggested-grid { display: flex; flex-wrap: wrap; gap: 1.75rem; }
   .article-suggested-grid > * { flex: 0 1 220px; max-width: 260px; }
@@ -244,7 +246,7 @@
   .article-layout--magazine .article-copy p + p { margin-top: 1.05rem; }
   .article-layout--magazine .article-chapter { margin-bottom: 1.6rem; }
   .article-layout--magazine .article-chapter h2 { font-size: clamp(1.25rem, 1.7vw, 1.55rem); }
-  .article-layout--magazine .drop-cap::first-letter { font-size: 3.6em; }
+  .article-layout--magazine .drop-cap::first-letter { font-size: 6.7em; }
 }
 
 .article-cover-fade { animation: article-cover-fade-in 450ms ease; }
