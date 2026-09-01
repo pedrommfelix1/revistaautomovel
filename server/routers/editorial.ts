@@ -26,7 +26,7 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { canManageEditorialArticle, toEditorialSlug } from "../../shared/editorial";
 
 const sectionInput = z.object({
-  type: z.enum(["paragraph", "chapter", "quote", "suggested"]),
+  type: z.enum(["paragraph", "chapter", "quote", "suggested", "image"]),
   heading: z.string().max(220).nullable().optional(),
   body: z.string().max(20000).nullable().optional(),
   caption: z.string().max(500).nullable().optional(),

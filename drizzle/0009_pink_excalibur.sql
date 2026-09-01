@@ -1,0 +1,1 @@
+ALTER TABLE `articleSections` MODIFY COLUMN `type` enum('paragraph','chapter','quote','suggested','image') NOT NULL;

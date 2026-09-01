@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { articleCategories, articleImages, articles, articleSections, categories, InsertUser, loginAttempts, magazineIssues, siteGalleryImages, users } from "../drizzle/schema";
+import { articleCategories, articleImages, articles, articleSections, categories, InsertUser, loginAttempts, magazineIssues, siteGalleryImages, siteSettings, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -127,7 +127,7 @@ export async function deleteLoginAttempts(bucketKey: string) {
 }
 
 type SectionInput = {
-  type: "paragraph" | "chapter" | "quote" | "suggested";
+  type: "paragraph" | "chapter" | "quote" | "suggested" | "image";
   heading?: string | null;
   body?: string | null;
   caption?: string | null;
@@ -404,6 +404,30 @@ export async function replaceSiteGalleryImages(imageRows: ImageInput[]) {
       position: image.position,
     })));
   }
+}
+
+const DEFAULT_SITE_SETTINGS = {
+  homeKicker: "Revista independente / N.º 01",
+  homeHeadline: "Automóveis para ler, não apenas medir.",
+  homeSubtitle: "Ensaios, cultura e design automóvel com tempo para a imagem, a forma e a ideia.",
+};
+
+// Single row (id 1) — falls back to the shipped defaults if it's ever
+// missing rather than erroring, so the homepage never renders blank.
+export async function getSiteSettings() {
+  const db = await requireDb();
+  const [row] = await db.select().from(siteSettings).where(eq(siteSettings.id, 1)).limit(1);
+  return {
+    homeKicker: row?.homeKicker ?? DEFAULT_SITE_SETTINGS.homeKicker,
+    homeHeadline: row?.homeHeadline ?? DEFAULT_SITE_SETTINGS.homeHeadline,
+    homeSubtitle: row?.homeSubtitle ?? DEFAULT_SITE_SETTINGS.homeSubtitle,
+  };
+}
+
+export async function updateSiteSettings(input: { homeKicker: string | null; homeHeadline: string | null; homeSubtitle: string | null }) {
+  const db = await requireDb();
+  await db.insert(siteSettings).values({ id: 1, ...input }).onDuplicateKeyUpdate({ set: input });
+  return getSiteSettings();
 }
 
 export async function listMagazineIssues() {

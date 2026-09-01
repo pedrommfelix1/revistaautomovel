@@ -136,4 +136,20 @@ test.describe.serial("artigo de teste — título duplo, parágrafos, categorias
     await page.goto(`/pesquisa?q=${encodeURIComponent(listTitle.split(" ").slice(0, 3).join(" "))}`);
     await expect(page.getByText(listTitle)).toBeVisible();
   });
+
+  // wouter não repõe o scroll ao navegar (ao contrário de um carregamento de
+  // página completo) — reportado no iPhone Safari como artigos a abrirem a
+  // meio da página em vez de no topo. Reproduz-se com scroll para baixo numa
+  // listagem seguido de clique num artigo.
+  test("ao clicar num artigo a partir de uma lista com scroll, a página abre no topo", async ({ page }) => {
+    await page.goto("/noticias");
+    await expect(page.getByText(listTitle)).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 2000));
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(500);
+
+    await page.getByText(listTitle).click();
+    await page.waitForURL(`**/artigo/${articleSlug}`);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  });
 });

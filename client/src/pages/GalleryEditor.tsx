@@ -57,17 +57,29 @@ export default function GalleryEditor() {
   function reorderImages(from: number, to: number) { setImages((items) => reorderEditorialItems(items, from, to)); }
 
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files ?? []);
     event.target.value = "";
-    if (!file) return;
-    if (!file.type.startsWith("image/")) { toast.error("Selecione um ficheiro de imagem."); return; }
-    if (images.length >= 100) { toast.error("A galeria do site suporta até 100 imagens."); return; }
+    if (!files.length) return;
+    if (files.some((file) => !file.type.startsWith("image/"))) { toast.error("Selecione apenas ficheiros de imagem."); return; }
+
+    const remaining = 100 - images.length;
+    if (remaining <= 0) { toast.error("A galeria do site suporta até 100 imagens."); return; }
+    let toUpload = files;
+    if (files.length > remaining) {
+      toast.error(`Só há espaço para mais ${remaining} imagem${remaining === 1 ? "" : "s"}; as restantes foram ignoradas.`);
+      toUpload = files.slice(0, remaining);
+    }
+
     setUploading(true);
+    let uploaded = 0;
     try {
-      const dataUrl = await compressedDataUrl(file);
-      const asset = await uploadImage.mutateAsync({ dataUrl, fileName: file.name });
-      setImages((current) => [...current, { url: asset.url, storageKey: asset.key, altText: file.name.replace(/\.[^/.]+$/, ""), caption: "", position: current.length }]);
-      toast.success("Imagem adicionada. Guarde para persistir a ordem e a legenda.");
+      for (const file of toUpload) {
+        const dataUrl = await compressedDataUrl(file);
+        const asset = await uploadImage.mutateAsync({ dataUrl, fileName: file.name });
+        setImages((current) => [...current, { url: asset.url, storageKey: asset.key, altText: file.name.replace(/\.[^/.]+$/, ""), caption: "", position: current.length }]);
+        uploaded += 1;
+      }
+      toast.success(uploaded === 1 ? "Imagem adicionada. Guarde para persistir a ordem e a legenda." : `${uploaded} imagens adicionadas. Guarde para persistir a ordem e a legenda.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível carregar a imagem.");
     } finally {
@@ -100,7 +112,7 @@ export default function GalleryEditor() {
           <div className="flex flex-wrap gap-2">
             <label className={images.length >= 100 ? "pointer-events-none opacity-40" : ""}>
               <span className="editor-add inline-flex"><Upload size={13} /> {uploading ? "A preparar…" : "Adicionar imagens"}</span>
-              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void handleUpload(event)} className="sr-only" disabled={images.length >= 100 || uploading} />
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => void handleUpload(event)} className="sr-only" disabled={images.length >= 100 || uploading} />
             </label>
             <Button onClick={() => void handleSave()} disabled={saveImages.isPending || uploading} className="h-10 rounded-none bg-[#f0372f] text-[10px] font-bold uppercase tracking-[0.1em] text-white hover:bg-black"><Save size={14} /> {saveImages.isPending ? "A guardar…" : "Guardar"}</Button>
           </div>

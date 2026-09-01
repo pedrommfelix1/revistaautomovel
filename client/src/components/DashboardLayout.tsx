@@ -22,7 +22,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/useMobile";
-import { BookOpen, FilePenLine, House, Images, KeyRound, LogOut, PanelLeft } from "lucide-react";
+import { BookOpen, FilePenLine, House, Images, KeyRound, LayoutTemplate, LogOut, PanelLeft } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -31,6 +31,7 @@ const menuItems = [
   { icon: FilePenLine, label: "Artigos", path: "/redacao" },
   { icon: Images, label: "Multimédia", path: "/redacao/multimedia" },
   { icon: BookOpen, label: "Revista", path: "/redacao/revista" },
+  { icon: LayoutTemplate, label: "Página inicial", path: "/redacao/site" },
   { icon: KeyRound, label: "Conta", path: "/redacao/conta" },
   { icon: House, label: "Ver site", path: "/" },
 ];

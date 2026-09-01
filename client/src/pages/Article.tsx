@@ -115,9 +115,19 @@ function ArticleRecentMobile({ article, magazine }: { article: ArticleData; maga
   );
 }
 
-function ArticleSections({ article, galleryCount, onActiveImageChange }: { article: ArticleData; galleryCount: number; onActiveImageChange: (index: number) => void }) {
-  const openingIndex = article.sections.findIndex((section) => section.type !== "suggested" && Boolean(section.body));
+function ArticleSections({ article, galleryCount, onActiveImageChange, mobileImages }: { article: ArticleData; galleryCount: number; onActiveImageChange: (index: number) => void; mobileImages: GalleryFrame[] }) {
+  const openingIndex = article.sections.findIndex((section) => section.type !== "suggested" && section.type !== "image" && Boolean(section.body));
   const containerRef = useRef<HTMLDivElement | null>(null);
+  // Only visible below the 1024px breakpoint (lg:hidden) where the desktop's
+  // cycling sidebar photo isn't sticky — this gives mobile readers the same
+  // "photos keep appearing" feel by weaving in the article's own gallery.
+  let mobileImageCursor = 0;
+  function nextMobileImage(): GalleryFrame | null {
+    if (!mobileImages.length) return null;
+    const frame = mobileImages[mobileImageCursor % mobileImages.length];
+    mobileImageCursor += 1;
+    return frame;
+  }
 
   // The sticky photo cycles through the article's gallery as the reader
   // scrolls, in both reading and "modo revista". This tracks continuous
@@ -173,14 +183,26 @@ function ArticleSections({ article, galleryCount, onActiveImageChange }: { artic
         if (section.type === "quote") {
           return <figure key={section.id} className="my-12 border-y-2 border-black py-7 sm:my-16 sm:py-9"><blockquote className="text-3xl font-black leading-[0.98] tracking-[-0.055em] sm:text-4xl">“{section.body}”</blockquote>{section.caption && <figcaption className="mt-5 font-mono text-[10px] uppercase tracking-[0.12em] text-neutral-500">{section.caption}</figcaption>}</figure>;
         }
+        if (section.type === "image") {
+          if (!section.body) return null;
+          return <figure key={section.id} className="article-inline-figure"><img src={section.body} alt={section.heading ?? ""} className="w-full h-auto" />{section.caption && <figcaption className="article-caption">{section.caption}</figcaption>}</figure>;
+        }
         if (section.type === "chapter") {
           const isOpening = index === openingIndex;
           const paragraphs = section.body ? splitParagraphs(section.body) : [];
-          return <section key={section.id} className="article-chapter"><div className="article-chapter-heading mb-4"><span className="article-chapter-marker" /><h2>{section.heading}</h2></div>{paragraphs.map((paragraph, paragraphIndex) => <p key={paragraphIndex} className={isOpening && paragraphIndex === 0 ? "drop-cap" : ""}>{paragraph}</p>)}{section.caption && <p className="article-caption">{section.caption}</p>}</section>;
+          const mobilePhoto = nextMobileImage();
+          return <section key={section.id} className="article-chapter"><div className="article-chapter-heading mb-4"><span className="article-chapter-marker" /><h2>{section.heading}</h2></div>{paragraphs.map((paragraph, paragraphIndex) => <p key={paragraphIndex} className={isOpening && paragraphIndex === 0 ? "drop-cap" : ""}>{paragraph}</p>)}{section.caption && <p className="article-caption">{section.caption}</p>}{mobilePhoto && <figure className="article-inline-figure lg:hidden"><img src={mobilePhoto.url} alt="" className="w-full h-auto" />{mobilePhoto.caption && <figcaption className="article-caption">{mobilePhoto.caption}</figcaption>}</figure>}</section>;
         }
         const isOpening = index === openingIndex;
         const paragraphs = section.body ? splitParagraphs(section.body) : [];
-        return <section key={section.id} className="article-paragraph">{paragraphs.map((paragraph, paragraphIndex) => <p key={paragraphIndex} className={isOpening && paragraphIndex === 0 ? "drop-cap" : ""}>{paragraph}</p>)}{section.caption && <p className="article-caption">{section.caption}</p>}</section>;
+        return <section key={section.id} className="article-paragraph">{paragraphs.flatMap((paragraph, paragraphIndex) => {
+          const nodes = [<p key={`p-${paragraphIndex}`} className={isOpening && paragraphIndex === 0 ? "drop-cap" : ""}>{paragraph}</p>];
+          if (paragraphIndex % 3 === 2) {
+            const photo = nextMobileImage();
+            if (photo) nodes.push(<figure key={`img-${paragraphIndex}`} className="article-inline-figure lg:hidden"><img src={photo.url} alt="" className="w-full h-auto" />{photo.caption && <figcaption className="article-caption">{photo.caption}</figcaption>}</figure>);
+          }
+          return nodes;
+        })}{section.caption && <p className="article-caption">{section.caption}</p>}</section>;
       })}
     </div>
   );
@@ -200,6 +222,13 @@ export default function Article() {
     if (article.coverImageUrl) frames.push({ url: article.coverImageUrl, caption: article.coverImageCaption });
     article.images.forEach((image) => frames.push({ url: image.url, caption: image.caption }));
     return frames;
+  }, [article]);
+
+  // The cover already appears once at the top of the page, so mobile's
+  // inline gallery weaves in the rest of the article's own photos only.
+  const mobileGalleryImages = useMemo<GalleryFrame[]>(() => {
+    if (!article) return [];
+    return article.images.map((image) => ({ url: image.url, caption: image.caption }));
   }, [article]);
 
   useEffect(() => { setActiveImageIndex(0); }, [article?.id]);
@@ -234,7 +263,7 @@ export default function Article() {
             </div>
 
             <ArticleSidebar article={article} magazine={magazine} activeImage={galleryFrames[activeImageIndex] ?? null} />
-            <ArticleSections article={article} galleryCount={galleryFrames.length} onActiveImageChange={handleActiveImageChange} />
+            <ArticleSections article={article} galleryCount={galleryFrames.length} onActiveImageChange={handleActiveImageChange} mobileImages={mobileGalleryImages} />
           </div>
         </div>
 

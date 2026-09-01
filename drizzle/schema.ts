@@ -82,9 +82,11 @@ export const articles = mysqlTable("articles", {
 export const articleSections = mysqlTable("articleSections", {
   id: int("id").autoincrement().primaryKey(),
   articleId: int("articleId").notNull().references(() => articles.id, { onDelete: "cascade" }),
-  type: mysqlEnum("type", ["paragraph", "chapter", "quote", "suggested"]).notNull(),
+  type: mysqlEnum("type", ["paragraph", "chapter", "quote", "suggested", "image"]).notNull(),
+  /** For type "image": optional alt text. */
   heading: varchar("heading", { length: 220 }),
-  /** For type "suggested": comma-separated article ids to show as inline suggested reads. */
+  /** For type "suggested": comma-separated article ids to show as inline suggested reads.
+   * For type "image": the photo's URL. */
   body: text("body"),
   caption: text("caption"),
   position: int("position").notNull(),
@@ -126,6 +128,15 @@ export const magazineIssues = mysqlTable("magazineIssues", {
   coverImageUrl: text("coverImageUrl"),
   coverImageStorageKey: varchar("coverImageStorageKey", { length: 600 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+/** Single-row table (id is always 1) for editable homepage masthead copy. */
+export const siteSettings = mysqlTable("siteSettings", {
+  id: int("id").primaryKey(),
+  homeKicker: varchar("homeKicker", { length: 160 }),
+  homeHeadline: text("homeHeadline"),
+  homeSubtitle: text("homeSubtitle"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export type Category = typeof categories.$inferSelect;

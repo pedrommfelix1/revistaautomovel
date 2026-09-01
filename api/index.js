@@ -81,9 +81,11 @@ var articles = mysqlTable("articles", {
 var articleSections = mysqlTable("articleSections", {
   id: int("id").autoincrement().primaryKey(),
   articleId: int("articleId").notNull().references(() => articles.id, { onDelete: "cascade" }),
-  type: mysqlEnum("type", ["paragraph", "chapter", "quote", "suggested"]).notNull(),
+  type: mysqlEnum("type", ["paragraph", "chapter", "quote", "suggested", "image"]).notNull(),
+  /** For type "image": optional alt text. */
   heading: varchar("heading", { length: 220 }),
-  /** For type "suggested": comma-separated article ids to show as inline suggested reads. */
+  /** For type "suggested": comma-separated article ids to show as inline suggested reads.
+   * For type "image": the photo's URL. */
   body: text("body"),
   caption: text("caption"),
   position: int("position").notNull()
@@ -121,6 +123,13 @@ var magazineIssues = mysqlTable("magazineIssues", {
   coverImageUrl: text("coverImageUrl"),
   coverImageStorageKey: varchar("coverImageStorageKey", { length: 600 }),
   createdAt: timestamp("createdAt").defaultNow().notNull()
+});
+var siteSettings = mysqlTable("siteSettings", {
+  id: int("id").primaryKey(),
+  homeKicker: varchar("homeKicker", { length: 160 }),
+  homeHeadline: text("homeHeadline"),
+  homeSubtitle: text("homeSubtitle"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
 });
 
 // server/_core/env.ts
@@ -441,6 +450,25 @@ async function replaceSiteGalleryImages(imageRows) {
       position: image.position
     })));
   }
+}
+var DEFAULT_SITE_SETTINGS = {
+  homeKicker: "Revista independente / N.\xBA 01",
+  homeHeadline: "Autom\xF3veis para ler, n\xE3o apenas medir.",
+  homeSubtitle: "Ensaios, cultura e design autom\xF3vel com tempo para a imagem, a forma e a ideia."
+};
+async function getSiteSettings() {
+  const db = await requireDb();
+  const [row] = await db.select().from(siteSettings).where(eq(siteSettings.id, 1)).limit(1);
+  return {
+    homeKicker: row?.homeKicker ?? DEFAULT_SITE_SETTINGS.homeKicker,
+    homeHeadline: row?.homeHeadline ?? DEFAULT_SITE_SETTINGS.homeHeadline,
+    homeSubtitle: row?.homeSubtitle ?? DEFAULT_SITE_SETTINGS.homeSubtitle
+  };
+}
+async function updateSiteSettings(input) {
+  const db = await requireDb();
+  await db.insert(siteSettings).values({ id: 1, ...input }).onDuplicateKeyUpdate({ set: input });
+  return getSiteSettings();
 }
 async function listMagazineIssues() {
   const db = await requireDb();
@@ -1427,7 +1455,7 @@ var systemRouter = router({
 import { TRPCError as TRPCError3 } from "@trpc/server";
 import { z as z2 } from "zod";
 var sectionInput = z2.object({
-  type: z2.enum(["paragraph", "chapter", "quote", "suggested"]),
+  type: z2.enum(["paragraph", "chapter", "quote", "suggested", "image"]),
   heading: z2.string().max(220).nullable().optional(),
   body: z2.string().max(2e4).nullable().optional(),
   caption: z2.string().max(500).nullable().optional(),
@@ -1638,6 +1666,29 @@ var magazineRouter = router({
   })
 });
 
+// server/routers/settings.ts
+import { TRPCError as TRPCError6 } from "@trpc/server";
+import { z as z5 } from "zod";
+function assertCanManageSettings(ctx) {
+  if (ctx.user.role !== "admin") {
+    throw new TRPCError6({ code: "FORBIDDEN", message: "Apenas administradores podem editar as defini\xE7\xF5es do site." });
+  }
+}
+var homeSettingsInput = z5.object({
+  homeKicker: z5.string().max(160).nullable(),
+  homeHeadline: z5.string().max(400).nullable(),
+  homeSubtitle: z5.string().max(400).nullable()
+});
+var settingsRouter = router({
+  home: publicProcedure.query(() => getSiteSettings()),
+  manage: router({
+    saveHome: protectedProcedure.input(homeSettingsInput).mutation(async ({ ctx, input }) => {
+      assertCanManageSettings(ctx);
+      return updateSiteSettings(input);
+    })
+  })
+});
+
 // server/routers.ts
 var appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -1661,7 +1712,8 @@ var appRouter = router({
   }),
   editorial: editorialRouter,
   gallery: galleryRouter,
-  magazine: magazineRouter
+  magazine: magazineRouter,
+  settings: settingsRouter
 });
 
 // server/_core/context.ts

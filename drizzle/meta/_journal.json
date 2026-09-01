@@ -64,6 +64,20 @@
       "when": 1787932619155,
       "tag": "0008_dark_vargas",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1788114119651,
+      "tag": "0009_pink_excalibur",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1788117796067,
+      "tag": "0010_easy_tyger_tiger",
+      "breakpoints": true
     }
   ]
 }

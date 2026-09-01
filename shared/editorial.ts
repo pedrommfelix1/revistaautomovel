@@ -1,4 +1,4 @@
-export type EditorialSectionType = "paragraph" | "chapter" | "quote" | "suggested";
+export type EditorialSectionType = "paragraph" | "chapter" | "quote" | "suggested" | "image";
 
 export function toEditorialSlug(value: string): string {
   return value
@@ -28,6 +28,7 @@ export function sectionLabel(type: EditorialSectionType): string {
     chapter: "Capítulo",
     quote: "Citação",
     suggested: "Sugestões",
+    image: "Foto",
   };
 
   return labels[type];
