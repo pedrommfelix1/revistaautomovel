@@ -110,8 +110,8 @@ export default function GalleryEditor() {
             <p className="mt-2 text-xs text-neutral-500">{images.length}/100 imagens · independente dos artigos</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <label className={images.length >= 100 ? "pointer-events-none opacity-40" : ""}>
-              <span className="editor-add inline-flex"><Upload size={13} /> {uploading ? "A preparar…" : "Adicionar imagens"}</span>
+            <label className={`inline-flex h-10 cursor-pointer items-center gap-2 border border-black px-4 text-[10px] font-bold uppercase tracking-[0.1em] transition-colors hover:bg-black hover:text-white ${images.length >= 100 ? "pointer-events-none opacity-40" : ""}`}>
+              <Upload size={13} /> {uploading ? "A preparar…" : "Adicionar imagens"}
               <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => void handleUpload(event)} className="sr-only" disabled={images.length >= 100 || uploading} />
             </label>
             <Button onClick={() => void handleSave()} disabled={saveImages.isPending || uploading} className="h-10 rounded-none bg-[#f0372f] text-[10px] font-bold uppercase tracking-[0.1em] text-white hover:bg-black"><Save size={14} /> {saveImages.isPending ? "A guardar…" : "Guardar"}</Button>
