@@ -53,9 +53,18 @@ test.describe("sem sessão", () => {
 });
 
 test.describe("sessão autenticada, mas não administradora", () => {
-  test("não pode criar categorias", async () => {
+  test("não pode criar categorias de tipo", async () => {
     const client = apiClient(await devLoginCookie("user"));
     await expectErrorCode(client.editorial.manage.createCategory.mutate({ name: "Teste", kind: "tipo" }), "FORBIDDEN");
+  });
+
+  test("pode criar uma marca ao etiquetar um artigo, mas não a remover", async () => {
+    const client = apiClient(await devLoginCookie("user"));
+    const name = `[E2E] Marca ${Date.now()}`;
+    const created = await client.editorial.manage.createCategory.mutate({ name, kind: "marca" });
+    expect(created?.id).toBeTruthy();
+    await expectErrorCode(client.editorial.manage.deleteCategory.mutate({ id: created!.id }), "FORBIDDEN");
+    await apiClient(await devLoginCookie("admin")).editorial.manage.deleteCategory.mutate({ id: created!.id });
   });
 
   test("não pode gerir a galeria do site", async () => {

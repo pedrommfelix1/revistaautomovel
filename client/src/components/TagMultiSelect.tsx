@@ -1,7 +1,7 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, Plus, X } from "lucide-react";
 import { useState } from "react";
 
 type TagOption = { id: number; name: string };
@@ -12,18 +12,41 @@ export function TagMultiSelect({
   selectedIds,
   onChange,
   placeholder = "Selecionar…",
+  onCreate,
 }: {
   label: string;
   options: TagOption[];
   selectedIds: number[];
   onChange: (ids: number[]) => void;
   placeholder?: string;
+  /** When set, typing a name with no match offers a "Criar…" option. */
+  onCreate?: (name: string) => Promise<TagOption | null>;
 }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [creating, setCreating] = useState(false);
   const selected = options.filter((option) => selectedIds.includes(option.id));
 
   function toggle(id: number) {
     onChange(selectedIds.includes(id) ? selectedIds.filter((current) => current !== id) : [...selectedIds, id]);
+  }
+
+  const trimmed = search.trim();
+  const hasExactMatch = options.some((option) => option.name.toLowerCase() === trimmed.toLowerCase());
+  const canCreate = Boolean(onCreate) && trimmed.length >= 2 && !hasExactMatch;
+
+  async function handleCreate() {
+    if (!onCreate || creating || !trimmed) return;
+    setCreating(true);
+    try {
+      const created = await onCreate(trimmed);
+      if (created) {
+        onChange([...selectedIds, created.id]);
+        setSearch("");
+      }
+    } finally {
+      setCreating(false);
+    }
   }
 
   return (
@@ -50,18 +73,25 @@ export function TagMultiSelect({
           </button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-[280px] rounded-none border-black p-0">
-          <Command>
-            <CommandInput placeholder="Pesquisar…" className="text-sm" />
+          <Command shouldFilter={!onCreate}>
+            <CommandInput placeholder="Pesquisar…" className="text-sm" value={search} onValueChange={setSearch} />
             <CommandList>
-              <CommandEmpty>Sem resultados.</CommandEmpty>
+              {!canCreate && <CommandEmpty>Sem resultados.</CommandEmpty>}
               <CommandGroup>
-                {options.map((option) => (
+                {(onCreate ? options.filter((option) => option.name.toLowerCase().includes(trimmed.toLowerCase())) : options).map((option) => (
                   <CommandItem key={option.id} value={option.name} onSelect={() => toggle(option.id)} className="rounded-none">
                     <Checkbox checked={selectedIds.includes(option.id)} className="mr-2 rounded-none" />
                     {option.name}
                   </CommandItem>
                 ))}
               </CommandGroup>
+              {canCreate && (
+                <CommandGroup>
+                  <CommandItem onSelect={() => void handleCreate()} disabled={creating} className="rounded-none font-semibold">
+                    <Plus size={13} className="mr-2" /> {creating ? "A criar…" : `Criar "${trimmed}"`}
+                  </CommandItem>
+                </CommandGroup>
+              )}
             </CommandList>
           </Command>
         </PopoverContent>

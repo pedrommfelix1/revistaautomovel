@@ -255,9 +255,15 @@ async function listCategories() {
 }
 async function createCategory(input) {
   const db = await requireDb();
+  const [existing] = await db.select().from(categories).where(eq(categories.slug, input.slug)).limit(1);
+  if (existing) return existing;
   await db.insert(categories).values(input);
   const [created] = await db.select().from(categories).where(eq(categories.slug, input.slug)).limit(1);
   return created;
+}
+async function deleteCategory(id) {
+  const db = await requireDb();
+  await db.delete(categories).where(eq(categories.id, id));
 }
 async function findArticleById(id) {
   const db = await requireDb();
@@ -1564,11 +1570,18 @@ var editorialRouter = router({
       return { success: true, id: input.id };
     }),
     createCategory: protectedProcedure.input(z2.object({ name: z2.string().min(2).max(80), description: z2.string().max(240).nullable().optional(), kind: z2.enum(["tipo", "marca"]) })).mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") {
-        throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores podem criar categorias." });
+      if (ctx.user.role !== "admin" && input.kind !== "marca") {
+        throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores podem criar categorias deste tipo." });
       }
       const slug = toEditorialSlug(input.name);
       return createCategory({ name: input.name, slug, description: input.description ?? null, kind: input.kind });
+    }),
+    deleteCategory: protectedProcedure.input(z2.object({ id: z2.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores podem remover categorias." });
+      }
+      await deleteCategory(input.id);
+      return { success: true, id: input.id };
     }),
     uploadImage: protectedProcedure.input(z2.object({ id: z2.number().int().positive(), dataUrl: z2.string().min(32).max(8e6), fileName: z2.string().min(1).max(180) })).mutation(async ({ ctx, input }) => {
       await assertCanManageArticle(ctx, input.id);

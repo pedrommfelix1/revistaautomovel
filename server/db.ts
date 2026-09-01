@@ -153,11 +153,24 @@ export async function listCategories() {
   return db.select().from(categories).orderBy(asc(categories.name));
 }
 
+// find-or-create by slug: editors can type a brand that turns out to already
+// exist (different casing, a colleague just added it) — returning the
+// existing row instead of throwing a duplicate-key error is friendlier than
+// erroring on what looks like a routine "add this tag" action.
 export async function createCategory(input: { name: string; slug: string; description: string | null; kind: "tipo" | "marca" }) {
   const db = await requireDb();
+  const [existing] = await db.select().from(categories).where(eq(categories.slug, input.slug)).limit(1);
+  if (existing) return existing;
   await db.insert(categories).values(input);
   const [created] = await db.select().from(categories).where(eq(categories.slug, input.slug)).limit(1);
   return created;
+}
+
+// articleCategories.categoryId cascades on delete, so removing a category
+// also untags every article that had it — no separate cleanup needed.
+export async function deleteCategory(id: number) {
+  const db = await requireDb();
+  await db.delete(categories).where(eq(categories.id, id));
 }
 
 export async function findArticleById(id: number) {

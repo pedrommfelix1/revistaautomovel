@@ -4,6 +4,7 @@ import {
   createArticle,
   createCategory,
   deleteArticle,
+  deleteCategory,
   findArticleById,
   findArticleBySlug,
   findArticleByTitle,
@@ -144,11 +145,21 @@ export const editorialRouter = router({
       return { success: true as const, id: input.id };
     }),
     createCategory: protectedProcedure.input(z.object({ name: z.string().min(2).max(80), description: z.string().max(240).nullable().optional(), kind: z.enum(["tipo", "marca"]) })).mutation(async ({ ctx, input }) => {
-      if (ctx.user.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem criar categorias." });
+      // "Tipo" (SUV, Compacto, ...) is a fixed taxonomy — admin-only. "Marca"
+      // grows constantly as new car brands appear, so any signed-in editor
+      // can add one on the fly while tagging an article.
+      if (ctx.user.role !== "admin" && input.kind !== "marca") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem criar categorias deste tipo." });
       }
       const slug = toEditorialSlug(input.name);
       return createCategory({ name: input.name, slug, description: input.description ?? null, kind: input.kind });
+    }),
+    deleteCategory: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Apenas administradores podem remover categorias." });
+      }
+      await deleteCategory(input.id);
+      return { success: true as const, id: input.id };
     }),
     uploadImage: protectedProcedure.input(z.object({ id: z.number().int().positive(), dataUrl: z.string().min(32).max(8_000_000), fileName: z.string().min(1).max(180) })).mutation(async ({ ctx, input }) => {
       await assertCanManageArticle(ctx, input.id);
