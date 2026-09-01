@@ -208,7 +208,17 @@
   .article-paragraph { margin-bottom: 1.75rem; }
   .article-caption, .article-cover-area figcaption { margin-top: 0.55rem; font-family: "DM Mono", monospace; font-size: 0.65rem !important; line-height: 1.5 !important; letter-spacing: 0.02em !important; color: #666; overflow-wrap: anywhere; word-break: break-word; }
   .article-inline-figure { margin: 2rem 0; }
+  /* Fallback for browsers without `initial-letter` (Firefox): the classic
+     float + oversized-font-size hack, hand-tuned to roughly span 5 lines. */
   .drop-cap::first-letter { float: left; margin: 0.03em 0.12em 0 0; color: #f0372f; font-family: "Archivo", sans-serif; font-size: 9.1em; font-weight: 700; line-height: 0.72; }
+
+  /* Chrome/Edge 110+ and Safari: native drop-cap sizing lets the browser
+     compute the correct size and keeps the cap-height flush with the first
+     line and the base flush with the last — no manual tuning, and it
+     adapts automatically to magazine mode's smaller text metrics too. */
+  @supports (initial-letter: 4) or (-webkit-initial-letter: 4) {
+    .drop-cap::first-letter { float: none; initial-letter: 5; -webkit-initial-letter: 5; font-size: inherit; line-height: inherit; margin: 0 0.1em 0 0; }
+  }
   .article-suggested { margin: 2.6rem 0; padding: 1.5rem; border: 2px solid #111; background: #f7f7f5; width: fit-content; max-width: 100%; }
   .article-suggested-grid { display: flex; flex-wrap: wrap; gap: 1.75rem; }
   .article-suggested-grid > * { flex: 0 1 220px; max-width: 260px; }
@@ -246,7 +256,11 @@
   .article-layout--magazine .article-copy p + p { margin-top: 1.05rem; }
   .article-layout--magazine .article-chapter { margin-bottom: 1.6rem; }
   .article-layout--magazine .article-chapter h2 { font-size: clamp(1.25rem, 1.7vw, 1.55rem); }
-  .article-layout--magazine .drop-cap::first-letter { font-size: 6.7em; }
+  /* initial-letter (see base rule) auto-sizes itself correctly here too —
+     this override only matters for the Firefox float-hack fallback. */
+  @supports not ((initial-letter: 4) or (-webkit-initial-letter: 4)) {
+    .article-layout--magazine .drop-cap::first-letter { font-size: 6.7em; }
+  }
 }
 
 .article-cover-fade { animation: article-cover-fade-in 450ms ease; }
