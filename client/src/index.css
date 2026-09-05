@@ -3,6 +3,25 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@font-face {
+  font-family: "DIN Bold";
+  src: url("/fonts/DIN-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "DIN";
+  src: url("/fonts/DIN-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Freight Text";
+  src: url("/fonts/FreightTextLight.woff2") format("woff2");
+  font-weight: 300;
+  font-display: swap;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -187,11 +206,11 @@
   .home-masthead { display: grid; gap: 2.5rem; }
   /* "Archivo" and "Inter" stand in for the client's DIN and Mini Pro until
      those are licensed — swap the family names below once available. */
-  .article-title-area h1 { max-width: 900px; font-family: "Archivo", "DM Sans", sans-serif; font-size: clamp(2.6rem, 6vw, 6rem); font-weight: 700; line-height: 0.88; letter-spacing: -0.03em; overflow-wrap: normal; word-break: normal; }
-  .article-deck { max-width: 47rem; margin-top: 1.8rem; font-family: "Inter", "DM Sans", sans-serif; font-size: clamp(1.15rem, 2vw, 1.45rem); font-weight: 350; line-height: 1.42; color: #555; overflow-wrap: anywhere; word-break: break-word; }
+  .article-title-area h1 { max-width: 900px; font-family: "DIN Bold", "DM Sans", sans-serif; font-size: clamp(2.6rem, 6vw, 6rem); font-weight: 700; line-height: 0.88; letter-spacing: -0.03em; overflow-wrap: normal; word-break: normal; }
+  .article-deck { max-width: 47rem; margin-top: 1.8rem; font-family: "DIN", "DM Sans", sans-serif; font-size: clamp(1.15rem, 2vw, 1.45rem); font-weight: 300; line-height: 1.42; color: #555; overflow-wrap: anywhere; word-break: break-word; }
   .article-layout { width: min(100% - 2.5rem, 1400px); margin: 2rem auto 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3rem; }
   .article-copy { min-width: 0; }
-  .article-copy p { font-family: "Inter", "DM Sans", sans-serif; font-weight: 400; font-size: clamp(1.16rem, 2.05vw, 1.43rem); line-height: 1.7; letter-spacing: -0.02em; overflow-wrap: anywhere; word-break: break-word; hyphens: auto; }
+  .article-copy p { font-family: "Freight Text", "DM Sans", sans-serif; font-weight: 300; font-size: clamp(1.16rem, 2.05vw, 1.43rem); line-height: 1.7; letter-spacing: -0.02em; overflow-wrap: anywhere; word-break: break-word; hyphens: auto; }
   .article-copy p + p { margin-top: 1.5rem; }
   .article-sidebar { min-width: 0; }
   .article-sidebar-heading { border-bottom: 2px solid #111; padding-bottom: 0.6rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
@@ -203,14 +222,14 @@
   .article-chapter { margin-bottom: 2.3rem; }
   .article-chapter-heading { position: relative; }
   .article-chapter-marker { position: absolute; top: 0.38em; left: -1.15rem; width: 0.7rem; height: 0.7rem; background: #f0372f; }
-  .article-chapter h2 { font-family: "Archivo", "DM Sans", sans-serif; font-size: clamp(1.7rem, 3vw, 2.35rem); font-weight: 700; letter-spacing: -0.055em; line-height: 1; overflow-wrap: anywhere; word-break: break-word; }
+  .article-chapter h2 { font-family: "DIN", "DM Sans", sans-serif; font-size: clamp(1.7rem, 3vw, 2.35rem); font-weight: 700; letter-spacing: -0.055em; line-height: 1; overflow-wrap: anywhere; word-break: break-word; }
   .article-copy blockquote { overflow-wrap: anywhere; word-break: break-word; }
   .article-paragraph { margin-bottom: 1.75rem; }
   .article-caption, .article-cover-area figcaption { margin-top: 0.55rem; font-family: "DM Mono", monospace; font-size: 0.65rem !important; line-height: 1.5 !important; letter-spacing: 0.02em !important; color: #666; overflow-wrap: anywhere; word-break: break-word; }
   .article-inline-figure { margin: 2rem 0; }
   /* Fallback for browsers without `initial-letter` (Firefox): the classic
      float + oversized-font-size hack, hand-tuned to roughly span 5 lines. */
-  .drop-cap::first-letter { float: left; margin: 0.03em 0.12em 0 0; color: #f0372f; font-family: "Archivo", sans-serif; font-size: 9.1em; font-weight: 700; line-height: 0.72; }
+  .drop-cap::first-letter { float: left; margin: 0.03em 0.12em 0 0; color: #f0372f; font-family: "DIN", sans-serif; font-size: 9.1em; font-weight: 700; line-height: 0.72; }
 
   /* Chrome/Edge 110+ and Safari: native drop-cap sizing lets the browser
      compute the correct size and keeps the cap-height flush with the first
