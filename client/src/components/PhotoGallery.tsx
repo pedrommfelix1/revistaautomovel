@@ -37,7 +37,6 @@ export function PhotoGallery({ images }: { images: GalleryImage[] }) {
         {images.map((image, index) => (
           <button key={image.id} onClick={() => setActiveIndex(index)} className="group relative block overflow-hidden bg-neutral-100 text-left focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black">
             <img src={image.url} alt={image.altText ?? "Fotografia da galeria"} loading={index > 8 ? "lazy" : "eager"} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
-            <span className="absolute bottom-0 left-0 bg-white px-2 py-1 font-mono text-[10px] font-bold text-black">{String(index + 1).padStart(2, "0")}</span>
           </button>
         ))}
       </div>

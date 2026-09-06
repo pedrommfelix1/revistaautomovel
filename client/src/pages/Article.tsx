@@ -42,6 +42,21 @@ function splitParagraphs(body: string): string[] {
   return body.split(/\n+/).map((paragraph) => paragraph.trim()).filter(Boolean);
 }
 
+const LEADING_QUOTE = /^(["“”'‘’«])/;
+
+// CSS's ::first-letter (used for the drop cap) folds in any leading
+// punctuation, so a paragraph that opens with a quotation mark would get the
+// quote character sized up right along with the actual letter — and a
+// preceding sibling element (tried first) turns out to make Chrome drop
+// ::first-letter/initial-letter matching entirely. Stripping the quote out
+// of the paragraph's own text and rendering it as a small separate mark
+// keeps the drop cap itself exactly one real letter.
+function DropCapParagraph({ text }: { text: string }) {
+  const match = text.match(LEADING_QUOTE);
+  if (!match) return <p className="drop-cap">{text}</p>;
+  return <><span className="drop-cap-quote">{match[1]}</span><p className="drop-cap">{text.slice(match[1].length)}</p></>;
+}
+
 function useRecentArticles(excludeId: number) {
   const { data: recent = [] } = trpc.editorial.latest.useQuery({ limit: 6 });
   return recent.filter((item) => item.id !== excludeId).slice(0, 5);
@@ -191,12 +206,13 @@ function ArticleSections({ article, galleryCount, onActiveImageChange, mobileIma
           const isOpening = index === openingIndex;
           const paragraphs = section.body ? splitParagraphs(section.body) : [];
           const mobilePhoto = nextMobileImage();
-          return <section key={section.id} className="article-chapter"><div className="article-chapter-heading mb-4"><span className="article-chapter-marker" /><h2>{section.heading}</h2></div>{paragraphs.map((paragraph, paragraphIndex) => <p key={paragraphIndex} className={isOpening && paragraphIndex === 0 ? "drop-cap" : ""}>{paragraph}</p>)}{section.caption && <p className="article-caption">{section.caption}</p>}{mobilePhoto && <figure className="article-inline-figure lg:hidden"><img src={mobilePhoto.url} alt="" className="w-full h-auto" />{mobilePhoto.caption && <figcaption className="article-caption">{mobilePhoto.caption}</figcaption>}</figure>}</section>;
+          return <section key={section.id} className="article-chapter"><div className="article-chapter-heading mb-4"><span className="article-chapter-marker" /><h2>{section.heading}</h2></div>{paragraphs.map((paragraph, paragraphIndex) => isOpening && paragraphIndex === 0 ? <DropCapParagraph key={paragraphIndex} text={paragraph} /> : <p key={paragraphIndex}>{paragraph}</p>)}{section.caption && <p className="article-caption">{section.caption}</p>}{mobilePhoto && <figure className="article-inline-figure lg:hidden"><img src={mobilePhoto.url} alt="" className="w-full h-auto" />{mobilePhoto.caption && <figcaption className="article-caption">{mobilePhoto.caption}</figcaption>}</figure>}</section>;
         }
         const isOpening = index === openingIndex;
         const paragraphs = section.body ? splitParagraphs(section.body) : [];
         return <section key={section.id} className="article-paragraph">{paragraphs.flatMap((paragraph, paragraphIndex) => {
-          const nodes = [<p key={`p-${paragraphIndex}`} className={isOpening && paragraphIndex === 0 ? "drop-cap" : ""}>{paragraph}</p>];
+          const isDropCap = isOpening && paragraphIndex === 0;
+          const nodes = [isDropCap ? <DropCapParagraph key={`p-${paragraphIndex}`} text={paragraph} /> : <p key={`p-${paragraphIndex}`}>{paragraph}</p>];
           if (paragraphIndex % 3 === 2) {
             const photo = nextMobileImage();
             if (photo) nodes.push(<figure key={`img-${paragraphIndex}`} className="article-inline-figure lg:hidden"><img src={photo.url} alt="" className="w-full h-auto" />{photo.caption && <figcaption className="article-caption">{photo.caption}</figcaption>}</figure>);
