@@ -28,12 +28,12 @@ import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 
 const menuItems = [
-  { icon: FilePenLine, label: "Artigos", path: "/redacao" },
-  { icon: Images, label: "Multimédia", path: "/redacao/multimedia" },
-  { icon: BookOpen, label: "Revista", path: "/redacao/revista" },
-  { icon: LayoutTemplate, label: "Site", path: "/redacao/site" },
-  { icon: KeyRound, label: "Conta", path: "/redacao/conta" },
-  { icon: House, label: "Ver site", path: "/" },
+  { icon: FilePenLine, label: "Artigos", path: "/redacao", adminOnly: false },
+  { icon: Images, label: "Multimédia", path: "/redacao/multimedia", adminOnly: true },
+  { icon: BookOpen, label: "Revista", path: "/redacao/revista", adminOnly: true },
+  { icon: LayoutTemplate, label: "Site", path: "/redacao/site", adminOnly: true },
+  { icon: KeyRound, label: "Conta", path: "/redacao/conta", adminOnly: false },
+  { icon: House, label: "Ver site", path: "/", adminOnly: false },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -133,6 +133,8 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const isAdmin = user?.role === "admin";
+  const visibleMenuItems = menuItems.filter(item => isAdmin || !item.adminOnly);
   const activeMenuItem = menuItems.find(item => item.path === location);
   const isMobile = useIsMobile();
 
@@ -201,7 +203,7 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0">
             <SidebarMenu className="px-2 py-1">
-              {menuItems.map(item => {
+              {visibleMenuItems.map(item => {
                 const isActive = location === item.path;
                 return (
                   <SidebarMenuItem key={item.path}>
