@@ -427,7 +427,9 @@ const DEFAULT_SITE_SETTINGS = {
   aboutIntro: "Espaço reservado — atualize com o texto real sobre quem escreve o Auto Turbo.",
   aboutBody: "",
   aboutEmail: "redacao@autoturbo.pt",
+  aboutEmailEnabled: true,
   aboutSocial: "",
+  aboutSocialEnabled: true,
 };
 
 type SiteSettingsRow = typeof DEFAULT_SITE_SETTINGS;
@@ -437,7 +439,7 @@ type SiteSettingsRow = typeof DEFAULT_SITE_SETTINGS;
 export async function getSiteSettings(): Promise<SiteSettingsRow> {
   const db = await requireDb();
   const [row] = await db.select().from(siteSettings).where(eq(siteSettings.id, 1)).limit(1);
-  const key = (name: keyof SiteSettingsRow) => row?.[name] ?? DEFAULT_SITE_SETTINGS[name];
+  const key = <K extends keyof SiteSettingsRow>(name: K): SiteSettingsRow[K] => (row?.[name] ?? DEFAULT_SITE_SETTINGS[name]) as SiteSettingsRow[K];
   return {
     homeKicker: key("homeKicker"),
     homeHeadline: key("homeHeadline"),
@@ -446,11 +448,17 @@ export async function getSiteSettings(): Promise<SiteSettingsRow> {
     aboutIntro: key("aboutIntro"),
     aboutBody: key("aboutBody"),
     aboutEmail: key("aboutEmail"),
+    aboutEmailEnabled: key("aboutEmailEnabled"),
     aboutSocial: key("aboutSocial"),
+    aboutSocialEnabled: key("aboutSocialEnabled"),
   };
 }
 
-export async function updateSiteSettings(input: Partial<{ [K in keyof SiteSettingsRow]: SiteSettingsRow[K] | null }>) {
+type NullableSiteSettingsInput = {
+  [K in keyof SiteSettingsRow]?: SiteSettingsRow[K] extends boolean ? SiteSettingsRow[K] : SiteSettingsRow[K] | null;
+};
+
+export async function updateSiteSettings(input: NullableSiteSettingsInput) {
   const db = await requireDb();
   await db.insert(siteSettings).values({ id: 1, ...input }).onDuplicateKeyUpdate({ set: input });
   return getSiteSettings();

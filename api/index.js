@@ -134,7 +134,9 @@ var siteSettings = mysqlTable("siteSettings", {
   /** Blank-line-separated paragraphs, same convention as article bodies. */
   aboutBody: text("aboutBody"),
   aboutEmail: varchar("aboutEmail", { length: 320 }),
+  aboutEmailEnabled: boolean("aboutEmailEnabled").default(true).notNull(),
   aboutSocial: text("aboutSocial"),
+  aboutSocialEnabled: boolean("aboutSocialEnabled").default(true).notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
 });
 
@@ -471,7 +473,9 @@ var DEFAULT_SITE_SETTINGS = {
   aboutIntro: "Espa\xE7o reservado \u2014 atualize com o texto real sobre quem escreve o Auto Turbo.",
   aboutBody: "",
   aboutEmail: "redacao@autoturbo.pt",
-  aboutSocial: ""
+  aboutEmailEnabled: true,
+  aboutSocial: "",
+  aboutSocialEnabled: true
 };
 async function getSiteSettings() {
   const db = await requireDb();
@@ -485,7 +489,9 @@ async function getSiteSettings() {
     aboutIntro: key("aboutIntro"),
     aboutBody: key("aboutBody"),
     aboutEmail: key("aboutEmail"),
-    aboutSocial: key("aboutSocial")
+    aboutEmailEnabled: key("aboutEmailEnabled"),
+    aboutSocial: key("aboutSocial"),
+    aboutSocialEnabled: key("aboutSocialEnabled")
   };
 }
 async function updateSiteSettings(input) {
@@ -1714,7 +1720,9 @@ var aboutSettingsInput = z5.object({
   aboutIntro: z5.string().max(500).nullable(),
   aboutBody: z5.string().max(4e3).nullable(),
   aboutEmail: z5.string().max(320).nullable(),
-  aboutSocial: z5.string().max(500).nullable()
+  aboutEmailEnabled: z5.boolean(),
+  aboutSocial: z5.string().max(500).nullable(),
+  aboutSocialEnabled: z5.boolean()
 });
 var settingsRouter = router({
   home: publicProcedure.query(() => getSiteSettings()),

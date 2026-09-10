@@ -29,6 +29,14 @@ test.describe("sem sessão", () => {
     await expectErrorCode(anon.magazine.manage.delete.mutate({ id: 999999 }), "UNAUTHORIZED");
   });
 
+  test("settings.manage.* exige sessão", async () => {
+    await expectErrorCode(anon.settings.manage.saveHome.mutate({ homeKicker: null, homeHeadline: null, homeSubtitle: null }), "UNAUTHORIZED");
+    await expectErrorCode(
+      anon.settings.manage.saveAbout.mutate({ aboutTitle: null, aboutIntro: null, aboutBody: null, aboutEmail: null, aboutEmailEnabled: true, aboutSocial: null, aboutSocialEnabled: true }),
+      "UNAUTHORIZED",
+    );
+  });
+
   test("as rotas de upload da revista exigem sessão", async () => {
     const chunk = await fetch(`${BASE_URL}/api/magazine/upload-chunk?uploadId=x&index=0`, {
       method: "POST",
@@ -75,6 +83,15 @@ test.describe("sessão autenticada, mas não administradora", () => {
   test("não pode gerir a revista", async () => {
     const client = apiClient(await devLoginCookie("user"));
     await expectErrorCode(client.magazine.manage.delete.mutate({ id: 999999 }), "FORBIDDEN");
+  });
+
+  test("não pode editar as definições do site", async () => {
+    const client = apiClient(await devLoginCookie("user"));
+    await expectErrorCode(client.settings.manage.saveHome.mutate({ homeKicker: null, homeHeadline: null, homeSubtitle: null }), "FORBIDDEN");
+    await expectErrorCode(
+      client.settings.manage.saveAbout.mutate({ aboutTitle: null, aboutIntro: null, aboutBody: null, aboutEmail: null, aboutEmailEnabled: true, aboutSocial: null, aboutSocialEnabled: true }),
+      "FORBIDDEN",
+    );
   });
 
   test("não pode carregar partes de PDF para a revista", async () => {

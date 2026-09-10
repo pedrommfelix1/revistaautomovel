@@ -152,4 +152,31 @@ test.describe.serial("artigo de teste — título duplo, parágrafos, categorias
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
   });
+
+  // Playwright's Chromium doesn't implement navigator.share, so "Partilhar"
+  // always exercises the desktop dropdown fallback here — WhatsApp, SMS,
+  // Instagram (copy-link + toast), Email and Copiar link.
+  test("o botão partilhar mostra as opções comuns (WhatsApp, SMS, Instagram, Email, copiar link)", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.goto(`/artigo/${articleSlug}`);
+    await page.getByRole("button", { name: /partilhar/i }).click();
+    await expect(page.getByRole("menuitem", { name: /whatsapp/i })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: /sms/i })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: /instagram/i })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: /email/i })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: /copiar link/i })).toBeVisible();
+
+    await page.getByRole("menuitem", { name: /copiar link/i }).click();
+    await expect(page.getByText(/link copiado/i)).toBeVisible();
+  });
+
+  test("o botão \"modo revista\" só aparece em desktop", async ({ page }) => {
+    await page.goto(`/artigo/${articleSlug}`);
+    await expect(page.getByRole("button", { name: /modo revista/i })).toBeVisible();
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto(`/artigo/${articleSlug}`);
+    await expect(page.getByRole("button", { name: /modo revista/i })).toBeHidden();
+    await expect(page.getByRole("button", { name: /partilhar/i })).toBeVisible();
+  });
 });

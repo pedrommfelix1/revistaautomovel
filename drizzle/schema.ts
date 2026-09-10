@@ -141,7 +141,9 @@ export const siteSettings = mysqlTable("siteSettings", {
   /** Blank-line-separated paragraphs, same convention as article bodies. */
   aboutBody: text("aboutBody"),
   aboutEmail: varchar("aboutEmail", { length: 320 }),
+  aboutEmailEnabled: boolean("aboutEmailEnabled").default(true).notNull(),
   aboutSocial: text("aboutSocial"),
+  aboutSocialEnabled: boolean("aboutSocialEnabled").default(true).notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 

@@ -3,6 +3,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { Save } from "lucide-react";
@@ -10,7 +11,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 type HomeForm = { homeKicker: string; homeHeadline: string; homeSubtitle: string };
-type AboutForm = { aboutTitle: string; aboutIntro: string; aboutBody: string; aboutEmail: string; aboutSocial: string };
+type AboutForm = { aboutTitle: string; aboutIntro: string; aboutBody: string; aboutEmail: string; aboutEmailEnabled: boolean; aboutSocial: string; aboutSocialEnabled: boolean };
 
 export default function SiteSettings() {
   const { user } = useAuth();
@@ -20,13 +21,13 @@ export default function SiteSettings() {
   const saveAbout = trpc.settings.manage.saveAbout.useMutation();
 
   const [homeForm, setHomeForm] = useState<HomeForm>({ homeKicker: "", homeHeadline: "", homeSubtitle: "" });
-  const [aboutForm, setAboutForm] = useState<AboutForm>({ aboutTitle: "", aboutIntro: "", aboutBody: "", aboutEmail: "", aboutSocial: "" });
+  const [aboutForm, setAboutForm] = useState<AboutForm>({ aboutTitle: "", aboutIntro: "", aboutBody: "", aboutEmail: "", aboutEmailEnabled: true, aboutSocial: "", aboutSocialEnabled: true });
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!data || loaded) return;
     setHomeForm({ homeKicker: data.homeKicker, homeHeadline: data.homeHeadline, homeSubtitle: data.homeSubtitle });
-    setAboutForm({ aboutTitle: data.aboutTitle, aboutIntro: data.aboutIntro, aboutBody: data.aboutBody, aboutEmail: data.aboutEmail, aboutSocial: data.aboutSocial });
+    setAboutForm({ aboutTitle: data.aboutTitle, aboutIntro: data.aboutIntro, aboutBody: data.aboutBody, aboutEmail: data.aboutEmail, aboutEmailEnabled: data.aboutEmailEnabled, aboutSocial: data.aboutSocial, aboutSocialEnabled: data.aboutSocialEnabled });
     setLoaded(true);
   }, [data, loaded]);
 
@@ -50,7 +51,9 @@ export default function SiteSettings() {
         aboutIntro: aboutForm.aboutIntro.trim() || null,
         aboutBody: aboutForm.aboutBody.trim() || null,
         aboutEmail: aboutForm.aboutEmail.trim() || null,
+        aboutEmailEnabled: aboutForm.aboutEmailEnabled,
         aboutSocial: aboutForm.aboutSocial.trim() || null,
+        aboutSocialEnabled: aboutForm.aboutSocialEnabled,
       });
       toast.success("Página Sobre atualizada.");
     } catch (error) {
@@ -115,11 +118,23 @@ export default function SiteSettings() {
                 <Textarea id="about-body" value={aboutForm.aboutBody} onChange={(event) => setAboutForm((current) => ({ ...current, aboutBody: event.target.value }))} className="editor-input min-h-40" placeholder="Separe parágrafos com uma linha em branco." />
               </div>
               <div>
-                <Label htmlFor="about-email">Email de contacto</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="about-email">Email de contacto</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-neutral-500">{aboutForm.aboutEmailEnabled ? "Visível" : "Oculto"}</span>
+                    <Switch id="about-email-enabled" checked={aboutForm.aboutEmailEnabled} onCheckedChange={(checked) => setAboutForm((current) => ({ ...current, aboutEmailEnabled: checked }))} />
+                  </div>
+                </div>
                 <Input id="about-email" value={aboutForm.aboutEmail} onChange={(event) => setAboutForm((current) => ({ ...current, aboutEmail: event.target.value }))} className="editor-input" placeholder="redacao@autoturbo.pt" />
               </div>
               <div>
-                <Label htmlFor="about-social">Redes sociais</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="about-social">Redes sociais</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-neutral-500">{aboutForm.aboutSocialEnabled ? "Visível" : "Oculto"}</span>
+                    <Switch id="about-social-enabled" checked={aboutForm.aboutSocialEnabled} onCheckedChange={(checked) => setAboutForm((current) => ({ ...current, aboutSocialEnabled: checked }))} />
+                  </div>
+                </div>
                 <Textarea id="about-social" value={aboutForm.aboutSocial} onChange={(event) => setAboutForm((current) => ({ ...current, aboutSocial: event.target.value }))} className="editor-input min-h-20" placeholder="Ligações às redes sociais." />
               </div>
               <Button onClick={() => void handleSaveAbout()} disabled={saveAbout.isPending} className="h-10 rounded-none bg-[#f0372f] text-[10px] font-bold uppercase tracking-[0.1em] text-white hover:bg-black"><Save size={14} /> {saveAbout.isPending ? "A guardar…" : "Guardar"}</Button>

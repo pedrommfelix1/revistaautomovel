@@ -22,7 +22,9 @@ const aboutSettingsInput = z.object({
   aboutIntro: z.string().max(500).nullable(),
   aboutBody: z.string().max(4000).nullable(),
   aboutEmail: z.string().max(320).nullable(),
+  aboutEmailEnabled: z.boolean(),
   aboutSocial: z.string().max(500).nullable(),
+  aboutSocialEnabled: z.boolean(),
 });
 
 export const settingsRouter = router({

@@ -1,9 +1,11 @@
 import type { inferRouterOutputs } from "@trpc/server";
-import { ArrowLeft, Clock3, Newspaper, Search, Share2 } from "lucide-react";
+import { ArrowLeft, Clock3, Instagram, Link2, Mail, MessageCircle, MessageSquare, Newspaper, Search, Share2 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
+import { toast } from "sonner";
 import type { AppRouter } from "../../../server/routers";
 import type { CardArticle } from "@/components/ArticleCard";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EditorialFooter } from "@/components/EditorialFooter";
 import { EditorialHeader } from "@/components/EditorialHeader";
 import { PhotoGallery } from "@/components/PhotoGallery";
@@ -25,6 +27,60 @@ function useMagazineMode(): [boolean, () => void] {
   }, [enabled]);
 
   return [enabled, () => setEnabled((current) => !current)];
+}
+
+function copyShareLink(url: string, message: string) {
+  navigator.clipboard?.writeText(url)
+    .then(() => toast.success(message))
+    .catch(() => toast.error("Não foi possível copiar o link."));
+}
+
+// Mobile browsers get the OS-native share sheet (WhatsApp, Instagram,
+// SMS, Mail, ... all handled by the device itself). Desktop browsers
+// don't implement navigator.share, so they fall back to a menu of the
+// same common targets, built from web share intents where one exists.
+function ShareButton({ title, deck }: { title: string; deck: string | null }) {
+  const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+
+  async function shareNative() {
+    try {
+      await navigator.share({ title, text: deck ?? undefined, url: shareUrl });
+    } catch {
+      /* user cancelled the native share sheet */
+    }
+  }
+
+  if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+    return (
+      <button onClick={() => void shareNative()} className="ml-auto flex items-center gap-1.5 text-black hover:text-[#f0372f]" aria-label="Partilhar artigo">
+        <Share2 size={13} /> Partilhar
+      </button>
+    );
+  }
+
+  const shareText = `${title} — ${shareUrl}`;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="ml-auto flex items-center gap-1.5 text-black hover:text-[#f0372f]" aria-label="Partilhar artigo">
+          <Share2 size={13} /> Partilhar
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="rounded-none border-2 border-black">
+        <DropdownMenuItem asChild>
+          <a href={`https://wa.me/?text=${encodeURIComponent(shareText)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2"><MessageCircle size={14} /> WhatsApp</a>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <a href={`sms:?body=${encodeURIComponent(shareText)}`} className="flex items-center gap-2"><MessageSquare size={14} /> SMS</a>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => copyShareLink(shareUrl, "Link copiado — cola nos stories do Instagram.")} className="flex items-center gap-2"><Instagram size={14} /> Instagram</DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <a href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(shareUrl)}`} className="flex items-center gap-2"><Mail size={14} /> Email</a>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => copyShareLink(shareUrl, "Link copiado.")} className="flex items-center gap-2"><Link2 size={14} /> Copiar link</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
@@ -239,7 +295,7 @@ export default function Article() {
         <div className="editorial-shell pt-7 sm:pt-11">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <Link href="/" className="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-500 transition-colors hover:text-black"><ArrowLeft size={14} /> Índice</Link>
-            <button onClick={toggleMagazine} className="inline-flex items-center gap-2 border border-black px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition-colors hover:bg-black hover:text-white">
+            <button onClick={toggleMagazine} className="hidden items-center gap-2 border border-black px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition-colors hover:bg-black hover:text-white sm:inline-flex">
               <Newspaper size={13} /> {magazine ? "Ver em modo leitura" : "Experimentar modo revista"}
             </button>
           </div>
@@ -253,7 +309,7 @@ export default function Article() {
                 <span>Por <strong className="text-black">{article.authorName}</strong></span>
                 <span>{formatFullDate(article.publishedAt ?? article.createdAt)}</span>
                 <span className="flex items-center gap-1.5"><Clock3 size={13} /> {readTime} min</span>
-                <button className="ml-auto flex items-center gap-1.5 text-black hover:text-[#f0372f]" aria-label="Partilhar artigo"><Share2 size={13} /> Partilhar</button>
+                <ShareButton title={article.articleTitle || article.title} deck={article.deck} />
               </div>
             </div>
 
