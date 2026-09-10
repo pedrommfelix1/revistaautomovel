@@ -12,8 +12,6 @@ test.describe.serial("definições do site — toggle de contacto no Sobre", () 
     admin = apiClient(await devLoginCookie("admin"));
     original = await admin.settings.about.query();
     await admin.settings.manage.saveAbout.mutate({
-      aboutTitle: original.aboutTitle,
-      aboutIntro: original.aboutIntro,
       aboutBody: original.aboutBody,
       aboutEmail: "e2e@autoturbo.pt",
       aboutEmailEnabled: true,
@@ -25,8 +23,6 @@ test.describe.serial("definições do site — toggle de contacto no Sobre", () 
   test.afterAll(async () => {
     const cookie = await devLoginCookie("admin");
     await apiClient(cookie).settings.manage.saveAbout.mutate({
-      aboutTitle: original.aboutTitle,
-      aboutIntro: original.aboutIntro,
       aboutBody: original.aboutBody,
       aboutEmail: original.aboutEmail,
       aboutEmailEnabled: original.aboutEmailEnabled,
@@ -44,8 +40,6 @@ test.describe.serial("definições do site — toggle de contacto no Sobre", () 
   test("desativar o email esconde-o mas mantém as redes sociais visíveis", async ({ page }) => {
     const cookie = await devLoginCookie("admin");
     await apiClient(cookie).settings.manage.saveAbout.mutate({
-      aboutTitle: original.aboutTitle,
-      aboutIntro: original.aboutIntro,
       aboutBody: original.aboutBody,
       aboutEmail: "e2e@autoturbo.pt",
       aboutEmailEnabled: false,
@@ -61,8 +55,6 @@ test.describe.serial("definições do site — toggle de contacto no Sobre", () 
   test("desativar os dois campos remove a caixa de contacto por completo", async ({ page }) => {
     const cookie = await devLoginCookie("admin");
     await apiClient(cookie).settings.manage.saveAbout.mutate({
-      aboutTitle: original.aboutTitle,
-      aboutIntro: original.aboutIntro,
       aboutBody: original.aboutBody,
       aboutEmail: "e2e@autoturbo.pt",
       aboutEmailEnabled: false,

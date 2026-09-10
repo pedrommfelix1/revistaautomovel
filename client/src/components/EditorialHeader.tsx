@@ -5,7 +5,6 @@ import { Link } from "wouter";
 const mainTabs = [
   { label: "Início", href: "/" },
   { label: "Ensaios", href: "/noticias" },
-  { label: "Revista", href: "/revista" },
   { label: "Sobre", href: "/sobre" },
 ];
 

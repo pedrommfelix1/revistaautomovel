@@ -14,10 +14,9 @@ export default function About() {
       <EditorialHeader />
       <main className="editorial-shell flex-1 py-8 sm:py-12">
         <p className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[#f0372f]"><span className="h-3 w-3 bg-[#f0372f]" /> Sobre mim</p>
-        <h1 className="max-w-2xl text-5xl font-black tracking-[-0.075em] sm:text-7xl">{data?.aboutTitle}</h1>
-        <p className="mt-4 max-w-xl text-sm leading-relaxed text-neutral-600">{data?.aboutIntro}</p>
+        <h1 className="max-w-2xl text-5xl font-black tracking-[-0.075em] sm:text-7xl">Sobre</h1>
 
-        <div className="mt-14 grid gap-10 border-t-2 border-black pt-8 sm:grid-cols-[1.4fr_1fr]">
+        <div className="mt-10 grid gap-10 border-t-2 border-black pt-8 sm:grid-cols-[1.4fr_1fr]">
           <div className="space-y-5 text-base leading-relaxed text-neutral-700">
             {bodyParagraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
           </div>

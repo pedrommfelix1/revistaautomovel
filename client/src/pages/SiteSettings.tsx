@@ -10,7 +10,7 @@ import { Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-type AboutForm = { aboutTitle: string; aboutIntro: string; aboutBody: string; aboutEmail: string; aboutEmailEnabled: boolean; aboutSocial: string; aboutSocialEnabled: boolean };
+type AboutForm = { aboutBody: string; aboutEmail: string; aboutEmailEnabled: boolean; aboutSocial: string; aboutSocialEnabled: boolean };
 
 export default function SiteSettings() {
   const { user } = useAuth();
@@ -18,20 +18,18 @@ export default function SiteSettings() {
   const { data, isLoading } = trpc.settings.about.useQuery();
   const saveAbout = trpc.settings.manage.saveAbout.useMutation();
 
-  const [aboutForm, setAboutForm] = useState<AboutForm>({ aboutTitle: "", aboutIntro: "", aboutBody: "", aboutEmail: "", aboutEmailEnabled: true, aboutSocial: "", aboutSocialEnabled: true });
+  const [aboutForm, setAboutForm] = useState<AboutForm>({ aboutBody: "", aboutEmail: "", aboutEmailEnabled: true, aboutSocial: "", aboutSocialEnabled: true });
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!data || loaded) return;
-    setAboutForm({ aboutTitle: data.aboutTitle, aboutIntro: data.aboutIntro, aboutBody: data.aboutBody, aboutEmail: data.aboutEmail, aboutEmailEnabled: data.aboutEmailEnabled, aboutSocial: data.aboutSocial, aboutSocialEnabled: data.aboutSocialEnabled });
+    setAboutForm({ aboutBody: data.aboutBody, aboutEmail: data.aboutEmail, aboutEmailEnabled: data.aboutEmailEnabled, aboutSocial: data.aboutSocial, aboutSocialEnabled: data.aboutSocialEnabled });
     setLoaded(true);
   }, [data, loaded]);
 
   async function handleSaveAbout() {
     try {
       await saveAbout.mutateAsync({
-        aboutTitle: aboutForm.aboutTitle.trim() || null,
-        aboutIntro: aboutForm.aboutIntro.trim() || null,
         aboutBody: aboutForm.aboutBody.trim() || null,
         aboutEmail: aboutForm.aboutEmail.trim() || null,
         aboutEmailEnabled: aboutForm.aboutEmailEnabled,
@@ -61,14 +59,6 @@ export default function SiteSettings() {
             <p className="mt-8 font-mono text-xs uppercase tracking-[0.13em]">A carregar…</p>
           ) : (
             <div className="mt-8 space-y-5">
-              <div>
-                <Label htmlFor="about-title">Nome / título</Label>
-                <Input id="about-title" value={aboutForm.aboutTitle} onChange={(event) => setAboutForm((current) => ({ ...current, aboutTitle: event.target.value }))} className="editor-input" placeholder="Pedro Félix" />
-              </div>
-              <div>
-                <Label htmlFor="about-intro">Introdução</Label>
-                <Textarea id="about-intro" value={aboutForm.aboutIntro} onChange={(event) => setAboutForm((current) => ({ ...current, aboutIntro: event.target.value }))} className="editor-input min-h-20" placeholder="Uma ou duas frases de abertura." />
-              </div>
               <div>
                 <Label htmlFor="about-body">Texto principal</Label>
                 <Textarea id="about-body" value={aboutForm.aboutBody} onChange={(event) => setAboutForm((current) => ({ ...current, aboutBody: event.target.value }))} className="editor-input min-h-40" placeholder="Separe parágrafos com uma linha em branco." />

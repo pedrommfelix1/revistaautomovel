@@ -22,16 +22,14 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/useMobile";
-import { BookOpen, FilePenLine, House, Images, KeyRound, LayoutTemplate, LogOut, PanelLeft } from "lucide-react";
+import { FilePenLine, House, KeyRound, LayoutTemplate, LogOut, PanelLeft } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 
 const menuItems = [
   { icon: FilePenLine, label: "Artigos", path: "/redacao", adminOnly: false },
-  { icon: Images, label: "Multimédia", path: "/redacao/multimedia", adminOnly: true },
-  { icon: BookOpen, label: "Revista", path: "/redacao/revista", adminOnly: true },
-  { icon: LayoutTemplate, label: "Site", path: "/redacao/site", adminOnly: true },
+  { icon: LayoutTemplate, label: "Sobre", path: "/redacao/site", adminOnly: true },
   { icon: KeyRound, label: "Conta", path: "/redacao/conta", adminOnly: false },
   { icon: House, label: "Ver site", path: "/", adminOnly: false },
 ];

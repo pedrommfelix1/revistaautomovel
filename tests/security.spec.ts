@@ -32,7 +32,7 @@ test.describe("sem sessão", () => {
   test("settings.manage.* exige sessão", async () => {
     await expectErrorCode(anon.settings.manage.saveHome.mutate({ homeKicker: null, homeHeadline: null, homeSubtitle: null }), "UNAUTHORIZED");
     await expectErrorCode(
-      anon.settings.manage.saveAbout.mutate({ aboutTitle: null, aboutIntro: null, aboutBody: null, aboutEmail: null, aboutEmailEnabled: true, aboutSocial: null, aboutSocialEnabled: true }),
+      anon.settings.manage.saveAbout.mutate({ aboutBody: null, aboutEmail: null, aboutEmailEnabled: true, aboutSocial: null, aboutSocialEnabled: true }),
       "UNAUTHORIZED",
     );
   });
@@ -89,7 +89,7 @@ test.describe("sessão autenticada, mas não administradora", () => {
     const client = apiClient(await devLoginCookie("user"));
     await expectErrorCode(client.settings.manage.saveHome.mutate({ homeKicker: null, homeHeadline: null, homeSubtitle: null }), "FORBIDDEN");
     await expectErrorCode(
-      client.settings.manage.saveAbout.mutate({ aboutTitle: null, aboutIntro: null, aboutBody: null, aboutEmail: null, aboutEmailEnabled: true, aboutSocial: null, aboutSocialEnabled: true }),
+      client.settings.manage.saveAbout.mutate({ aboutBody: null, aboutEmail: null, aboutEmailEnabled: true, aboutSocial: null, aboutSocialEnabled: true }),
       "FORBIDDEN",
     );
   });

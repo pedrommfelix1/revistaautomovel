@@ -1716,8 +1716,6 @@ var homeSettingsInput = z5.object({
   homeSubtitle: z5.string().max(400).nullable()
 });
 var aboutSettingsInput = z5.object({
-  aboutTitle: z5.string().max(160).nullable(),
-  aboutIntro: z5.string().max(500).nullable(),
   aboutBody: z5.string().max(4e3).nullable(),
   aboutEmail: z5.string().max(320).nullable(),
   aboutEmailEnabled: z5.boolean(),

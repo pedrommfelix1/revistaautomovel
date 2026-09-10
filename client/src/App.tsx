@@ -8,15 +8,10 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import About from "./pages/About";
 import Article from "./pages/Article";
 import Category from "./pages/Category";
-import Gallery from "./pages/Gallery";
 import Home from "./pages/Home";
 import News from "./pages/News";
-import Magazine from "./pages/Magazine";
-import MagazineReader from "./pages/MagazineReader";
 import EditorialDesk from "./pages/EditorialDesk";
 import ArticleEditor from "./pages/ArticleEditor";
-import GalleryEditor from "./pages/GalleryEditor";
-import MagazineEditor from "./pages/MagazineEditor";
 import Account from "./pages/Account";
 import Search from "./pages/Search";
 import SiteSettings from "./pages/SiteSettings";
@@ -45,14 +40,9 @@ function Router() {
         <Route path={"/artigo/:slug"} component={Article} />
         <Route path={"/categoria/:slug"} component={Category} />
         <Route path={"/noticias"} component={News} />
-        <Route path={"/multimedia"} component={Gallery} />
-        <Route path={"/revista"} component={Magazine} />
-        <Route path={"/revista/:id"} component={MagazineReader} />
         <Route path={"/sobre"} component={About} />
         <Route path={"/pesquisa"} component={Search} />
         <Route path={"/redacao"} component={EditorialDesk} />
-        <Route path={"/redacao/multimedia"} component={GalleryEditor} />
-        <Route path={"/redacao/revista"} component={MagazineEditor} />
         <Route path={"/redacao/conta"} component={Account} />
         <Route path={"/redacao/site"} component={SiteSettings} />
         <Route path={"/redacao/:id"} component={ArticleEditor} />

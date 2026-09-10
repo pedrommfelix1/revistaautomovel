@@ -10,8 +10,8 @@ test.describe("navegação pública — smoke", () => {
     const nav = page.getByRole("navigation", { name: /navegação principal/i });
     await expect(nav.getByRole("link", { name: /início/i })).toBeVisible();
     await expect(nav.getByRole("link", { name: /ensaios/i })).toBeVisible();
-    await expect(nav.getByRole("link", { name: /revista/i })).toBeVisible();
     await expect(nav.getByRole("link", { name: /sobre/i })).toBeVisible();
+    await expect(nav.getByRole("link", { name: /revista/i })).toHaveCount(0);
     expect(erros).toEqual([]);
   });
 
@@ -29,19 +29,24 @@ test.describe("navegação pública — smoke", () => {
     await expect(page.getByLabel(/^marca$/i)).toBeVisible();
   });
 
-  test("multimédia carrega", async ({ page }) => {
-    await page.goto("/multimedia");
-    await expect(page.getByRole("heading", { name: "Multimédia" })).toBeVisible();
-  });
-
-  test("revista carrega", async ({ page }) => {
-    await page.goto("/revista");
-    await expect(page.getByRole("heading", { name: "Revista" })).toBeVisible();
-  });
-
-  test("sobre carrega", async ({ page }) => {
+  test("sobre carrega com título estático, sem nome/introdução editáveis", async ({ page }) => {
     await page.goto("/sobre");
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Sobre");
+  });
+
+  test("/revista e /multimedia já não existem no site público", async ({ page }) => {
+    await page.goto("/revista");
+    await expect(page.getByText(/404/)).toBeVisible();
+    await page.goto("/multimedia");
+    await expect(page.getByText(/404/)).toBeVisible();
+  });
+
+  test("backoffice já não lista Revista nem Multimédia, e Site passou a chamar-se Sobre", async ({ page }) => {
+    await page.goto("/redacao");
+    await expect(page.getByRole("button", { name: "Revista", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Multimédia", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Site", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Sobre", exact: true })).toBeVisible();
   });
 
   test("pesquisa pede pelo menos duas letras antes de procurar", async ({ page }) => {

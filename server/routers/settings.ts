@@ -18,8 +18,6 @@ const homeSettingsInput = z.object({
 });
 
 const aboutSettingsInput = z.object({
-  aboutTitle: z.string().max(160).nullable(),
-  aboutIntro: z.string().max(500).nullable(),
   aboutBody: z.string().max(4000).nullable(),
   aboutEmail: z.string().max(320).nullable(),
   aboutEmailEnabled: z.boolean(),
