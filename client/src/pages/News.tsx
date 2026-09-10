@@ -25,8 +25,8 @@ export default function News() {
       <EditorialHeader />
       <main className="editorial-shell flex-1 py-8 sm:py-12">
         <p className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[#f0372f]"><span className="h-3 w-3 bg-[#f0372f]" /> Arquivo editorial</p>
-        <h1 className="max-w-2xl text-5xl font-black tracking-[-0.075em] sm:text-7xl">Notícias</h1>
-        <p className="mt-4 max-w-xl text-sm leading-relaxed text-neutral-600">Todas as histórias publicadas no Motor de Linha, por ordem de publicação.</p>
+        <h1 className="max-w-2xl text-5xl font-black tracking-[-0.075em] sm:text-7xl">Ensaios</h1>
+        <p className="mt-4 max-w-xl text-sm leading-relaxed text-neutral-600">Todas as histórias publicadas no Auto Turbo, por ordem de publicação.</p>
 
         {categories.length > 0 && (
           <div className="mt-8 grid gap-4 border-t border-black pt-5 sm:grid-cols-2 sm:max-w-lg">

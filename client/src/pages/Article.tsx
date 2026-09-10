@@ -3,7 +3,7 @@ import { ArrowLeft, Clock3, Newspaper, Search, Share2 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import type { AppRouter } from "../../../server/routers";
-import { ArticleCard } from "@/components/ArticleCard";
+import type { CardArticle } from "@/components/ArticleCard";
 import { EditorialFooter } from "@/components/EditorialFooter";
 import { EditorialHeader } from "@/components/EditorialHeader";
 import { PhotoGallery } from "@/components/PhotoGallery";
@@ -32,7 +32,7 @@ type ArticleData = NonNullable<RouterOutputs["editorial"]["bySlug"]>;
 type GalleryFrame = { url: string; caption: string | null };
 
 function formatFullDate(value: Date | string | null) {
-  if (!value) return "Edição Motor de Linha";
+  if (!value) return "Edição Auto Turbo";
   return new Intl.DateTimeFormat("pt-PT", { day: "numeric", month: "long", year: "numeric" }).format(new Date(value));
 }
 
@@ -57,32 +57,28 @@ function DropCapParagraph({ text }: { text: string }) {
   return <><span className="drop-cap-quote">{match[1]}</span><p className="drop-cap">{text.slice(match[1].length)}</p></>;
 }
 
-function useRecentArticles(excludeId: number) {
-  const { data: recent = [] } = trpc.editorial.latest.useQuery({ limit: 6 });
-  return recent.filter((item) => item.id !== excludeId).slice(0, 5);
-}
-
-function RecentArticlesList({ items }: { items: { id: number; slug: string; title: string }[] }) {
-  if (!items.length) return null;
+// Horizontal, softly-bordered card for a "suggested read" inline in an
+// article — sits closer to the surrounding copy than the vertical,
+// heavy-bordered ArticleCard used on listing pages, so it reads as part of
+// the article rather than a separate boxed-off module.
+function SuggestedReadCard({ article }: { article: CardArticle }) {
   return (
-    <div>
-      <h2 className="article-sidebar-heading">Artigos recentes</h2>
-      <ol className="article-recent-list">
-        {items.map((item) => (
-          <li key={item.id} className="article-recent-item">
-            <span className="article-recent-marker" />
-            <Link href={`/artigo/${item.slug}`} className="article-recent-title no-underline">{item.title}</Link>
-          </li>
-        ))}
-      </ol>
-    </div>
+    <Link href={`/artigo/${article.slug}`} className="article-suggested-card no-underline text-black">
+      {article.coverImageUrl ? (
+        <img src={article.coverImageUrl} alt="" className="article-suggested-card-image" />
+      ) : <div className="article-suggested-card-image bg-[#e9e9e7]" />}
+      <span className="min-w-0">
+        {article.categories.length > 0 && <span className="article-suggested-card-category">{article.categories.map((category) => category.name).join(" / ")}</span>}
+        <span className="article-suggested-card-title">{article.title}</span>
+        {article.deck && <span className="article-suggested-card-deck">{article.deck}</span>}
+      </span>
+    </Link>
   );
 }
 
-function ArticleSidebar({ article, magazine, activeImage }: { article: ArticleData; magazine: boolean; activeImage: GalleryFrame | null }) {
+function ArticleSidebar({ article, activeImage }: { article: ArticleData; activeImage: GalleryFrame | null }) {
   const [, setLocation] = useLocation();
   const [query, setQuery] = useState("");
-  const items = useRecentArticles(article.id);
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -106,27 +102,8 @@ function ArticleSidebar({ article, magazine, activeImage }: { article: ArticleDa
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pesquisar…" aria-label="Pesquisar artigos" className="w-full min-w-0 border-0 px-3 py-2 text-sm outline-none" />
           <button type="submit" aria-label="Pesquisar" className="flex w-10 shrink-0 items-center justify-center bg-black text-white transition-colors hover:bg-[#f0372f]"><Search size={16} /></button>
         </form>
-
-        {/* On mobile "Artigos recentes" moves to the bottom of the page (see ArticleRecentMobile);
-            only the sticky desktop rail shows it bundled with the photo and search. Hidden
-            entirely in "modo revista", which keeps the rail focused on the photo. */}
-        {!magazine && (
-          <div className="mt-9 hidden lg:block">
-            <RecentArticlesList items={items} />
-          </div>
-        )}
       </div>
     </aside>
-  );
-}
-
-function ArticleRecentMobile({ article, magazine }: { article: ArticleData; magazine: boolean }) {
-  const items = useRecentArticles(article.id);
-  if (magazine || !items.length) return null;
-  return (
-    <div className="editorial-shell mt-16 border-t-2 border-black pt-7 lg:hidden">
-      <RecentArticlesList items={items} />
-    </div>
   );
 }
 
@@ -188,8 +165,8 @@ function ArticleSections({ article, galleryCount, onActiveImageChange, mobileIma
           return (
             <aside key={section.id} className="article-suggested">
               <div className="article-suggested-grid">
-                {items.map((item, itemIndex) => (
-                  <ArticleCard key={item.id} article={item} index={itemIndex} />
+                {items.map((item) => (
+                  <SuggestedReadCard key={item.id} article={item} />
                 ))}
               </div>
             </aside>
@@ -230,7 +207,9 @@ export default function Article() {
   useArticleHead({ title: article?.seoTitle || article?.title, description: article?.seoDescription || article?.deck, image: article?.socialImageUrl || article?.coverImageUrl, slug: article?.slug });
   const [magazine, toggleMagazine] = useMagazineMode();
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const handleActiveImageChange = useCallback((index: number) => setActiveImageIndex(index), []);
+  // Only ever advances — scrolling back up (or a jittery scroll position)
+  // must not bring back a photo the reader has already scrolled past.
+  const handleActiveImageChange = useCallback((index: number) => setActiveImageIndex((current) => Math.max(current, index)), []);
 
   const galleryFrames = useMemo<GalleryFrame[]>(() => {
     if (!article) return [];
@@ -278,13 +257,12 @@ export default function Article() {
               </div>
             </div>
 
-            <ArticleSidebar article={article} magazine={magazine} activeImage={galleryFrames[activeImageIndex] ?? null} />
+            <ArticleSidebar article={article} activeImage={galleryFrames[activeImageIndex] ?? null} />
             <ArticleSections article={article} galleryCount={galleryFrames.length} onActiveImageChange={handleActiveImageChange} mobileImages={mobileGalleryImages} />
           </div>
         </div>
 
         <div className="article-gallery-wrap"><PhotoGallery images={article.images} /></div>
-        <ArticleRecentMobile article={article} magazine={magazine} />
       </main>
       <EditorialFooter />
     </div>

@@ -13,7 +13,7 @@ export default function Magazine() {
       <main className="editorial-shell flex-1 py-11 sm:py-16">
         <p className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[#f0372f]"><span className="h-3 w-3 bg-[#f0372f]" /> Edições completas</p>
         <h1 className="max-w-2xl text-4xl font-black tracking-[-0.07em] sm:text-5xl">Revista</h1>
-        <p className="mt-4 max-w-xl text-sm leading-relaxed text-neutral-600">As edições completas do Motor de Linha, em PDF, para ler página a página.</p>
+        <p className="mt-4 max-w-xl text-sm leading-relaxed text-neutral-600">As edições completas do Auto Turbo, em PDF, para ler página a página.</p>
 
         {isLoading ? (
           <p className="mt-12 font-mono text-xs uppercase tracking-[0.13em] text-neutral-500">A carregar edições…</p>

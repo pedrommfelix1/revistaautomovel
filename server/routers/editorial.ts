@@ -104,7 +104,7 @@ export const editorialRouter = router({
         throw new TRPCError({ code: "CONFLICT", message: "Já existe um artigo com este título. Escolha outro nome." });
       }
       const slug = await uniqueArticleSlug(input.title);
-      return createArticle({ title: input.title, slug, authorId: ctx.user.id, authorName: ctx.user.name ?? "Autor Motor de Linha" });
+      return createArticle({ title: input.title, slug, authorId: ctx.user.id, authorName: ctx.user.name ?? "Autor Auto Turbo" });
     }),
     saveMetadata: protectedProcedure.input(metadataInput).mutation(async ({ ctx, input }) => {
       await assertCanManageArticle(ctx, input.id);

@@ -1,4 +1,4 @@
-import { ArrowRight, CirclePlus } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { ArticleCard } from "@/components/ArticleCard";
@@ -78,7 +78,6 @@ export default function Home() {
 
         <section className="editorial-shell mt-16 sm:mt-24"><div className="mb-7 flex items-center justify-between gap-4 border-t-2 border-black pt-5"><h2 className="text-[11px] font-bold uppercase tracking-[0.14em]">Últimas linhas</h2><Link href="/noticias" className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] hover:text-[#f0372f]">Ver arquivo <ArrowRight size={14} /></Link></div>{following.length ? <div className="grid gap-x-7 gap-y-14 sm:grid-cols-2 lg:grid-cols-3">{following.slice(0, 6).map((article, index) => <ArticleCard key={article.id} article={article} index={index + 1} />)}</div> : <p className="text-neutral-500">Novas histórias serão publicadas em breve.</p>}</section>
 
-        <section className="mt-20 bg-[#f0372f] text-white sm:mt-32"><div className="editorial-shell grid gap-8 py-11 sm:grid-cols-[1fr_auto] sm:items-center sm:py-14"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/70">Ferramenta editorial</p><h2 className="mt-2 max-w-2xl text-4xl font-black leading-[0.9] tracking-[-0.075em] sm:text-5xl">Uma história, um campo visual, até cem fotografias.</h2></div><Link href="/redacao" className="inline-flex items-center gap-2 self-start border-2 border-white px-5 py-3 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors hover:bg-white hover:text-black"><CirclePlus size={16} /> Entrar na redação</Link></div></section>
       </main>
       <EditorialFooter />
     </div>

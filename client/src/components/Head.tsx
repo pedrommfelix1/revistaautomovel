@@ -12,9 +12,9 @@ function upsertMeta(selector: string, attribute: "name" | "property", value: str
 
 export function useArticleHead(input: { title?: string | null; description?: string | null; image?: string | null; slug?: string | null }) {
   useEffect(() => {
-    const title = input.title?.trim() || "Motor de Linha";
+    const title = input.title?.trim() || "Auto Turbo";
     const description = input.description?.trim() || "Ensaios, cultura e design automóvel com uma leitura editorial cuidada.";
-    document.title = `${title} · Motor de Linha`;
+    document.title = `${title} · Auto Turbo`;
     upsertMeta('meta[name="description"]', "name", "description", description);
     upsertMeta('meta[property="og:title"]', "property", "og:title", title);
     upsertMeta('meta[property="og:description"]', "property", "og:description", description);

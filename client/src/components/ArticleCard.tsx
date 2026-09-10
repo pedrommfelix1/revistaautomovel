@@ -1,7 +1,7 @@
 import { ArrowUpRight } from "lucide-react";
 import { Link } from "wouter";
 
-type CardArticle = {
+export type CardArticle = {
   id: number;
   title: string;
   slug: string;
@@ -36,7 +36,7 @@ export function ArticleCard({ article, featured = false, index = 0 }: { article:
         <Link href={`/artigo/${article.slug}`} className="group/title no-underline text-black">
           <h3 className={`${featured ? "text-4xl sm:text-5xl lg:text-6xl" : "text-2xl sm:text-3xl"} max-w-4xl font-black leading-[0.94] tracking-[-0.065em]`}>{article.title}</h3>
         </Link>
-        {article.deck && <p className={`${featured ? "max-w-2xl text-base sm:text-lg" : "text-sm"} mt-4 leading-relaxed text-neutral-600 ${featured ? "" : "line-clamp-3"}`}>{article.deck}</p>}
+        {article.deck && <p className={`${featured ? "text-base sm:text-lg" : "text-sm"} mt-4 leading-relaxed text-neutral-600 ${featured ? "" : "line-clamp-3"}`}>{article.deck}</p>}
         <div className="mt-auto flex items-center justify-between gap-4 border-t border-black/20 pt-3 text-[10px] font-bold uppercase tracking-[0.11em] text-neutral-600">
           <span>{formatDate(article.publishedAt ?? article.createdAt)}</span>
           <Link href={`/artigo/${article.slug}`} aria-label={`Ler ${article.title}`} className="flex items-center gap-1 text-black transition-transform group-hover:translate-x-1">

@@ -50,7 +50,7 @@ export function PhotoGallery({ images }: { images: GalleryImage[] }) {
           <button onClick={(event) => { event.stopPropagation(); previous(); }} className="absolute left-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center border border-white/50 transition-colors hover:bg-white hover:text-black sm:left-8" aria-label="Imagem anterior"><ChevronLeft size={24} /></button>
           <figure className="flex h-full w-full flex-col items-center justify-center gap-4 px-16 py-20" onClick={(event) => event.stopPropagation()}>
             <img src={active.url} alt={active.altText ?? "Fotografia da galeria"} className="max-h-[76vh] max-w-full object-contain" />
-            <figcaption className="max-w-2xl text-center text-sm leading-relaxed text-white/70">{active.caption ?? "Fotografia editorial — Motor de Linha"}</figcaption>
+            <figcaption className="max-w-2xl text-center text-sm leading-relaxed text-white/70">{active.caption ?? "Fotografia editorial — Auto Turbo"}</figcaption>
           </figure>
           <button onClick={(event) => { event.stopPropagation(); next(); }} className="absolute right-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center border border-white/50 transition-colors hover:bg-white hover:text-black sm:right-8" aria-label="Imagem seguinte"><ChevronRight size={24} /></button>
         </div>

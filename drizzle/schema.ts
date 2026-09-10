@@ -130,12 +130,18 @@ export const magazineIssues = mysqlTable("magazineIssues", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-/** Single-row table (id is always 1) for editable homepage masthead copy. */
+/** Single-row table (id is always 1) for editable homepage masthead copy and the Sobre page. */
 export const siteSettings = mysqlTable("siteSettings", {
   id: int("id").primaryKey(),
   homeKicker: varchar("homeKicker", { length: 160 }),
   homeHeadline: text("homeHeadline"),
   homeSubtitle: text("homeSubtitle"),
+  aboutTitle: varchar("aboutTitle", { length: 160 }),
+  aboutIntro: text("aboutIntro"),
+  /** Blank-line-separated paragraphs, same convention as article bodies. */
+  aboutBody: text("aboutBody"),
+  aboutEmail: varchar("aboutEmail", { length: 320 }),
+  aboutSocial: text("aboutSocial"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 

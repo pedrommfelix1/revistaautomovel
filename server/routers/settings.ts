@@ -17,11 +17,24 @@ const homeSettingsInput = z.object({
   homeSubtitle: z.string().max(400).nullable(),
 });
 
+const aboutSettingsInput = z.object({
+  aboutTitle: z.string().max(160).nullable(),
+  aboutIntro: z.string().max(500).nullable(),
+  aboutBody: z.string().max(4000).nullable(),
+  aboutEmail: z.string().max(320).nullable(),
+  aboutSocial: z.string().max(500).nullable(),
+});
+
 export const settingsRouter = router({
   home: publicProcedure.query(() => getSiteSettings()),
+  about: publicProcedure.query(() => getSiteSettings()),
 
   manage: router({
     saveHome: protectedProcedure.input(homeSettingsInput).mutation(async ({ ctx, input }) => {
+      assertCanManageSettings(ctx);
+      return updateSiteSettings(input);
+    }),
+    saveAbout: protectedProcedure.input(aboutSettingsInput).mutation(async ({ ctx, input }) => {
       assertCanManageSettings(ctx);
       return updateSiteSettings(input);
     }),

@@ -423,21 +423,34 @@ const DEFAULT_SITE_SETTINGS = {
   homeKicker: "Revista independente / N.º 01",
   homeHeadline: "Automóveis para ler, não apenas medir.",
   homeSubtitle: "Ensaios, cultura e design automóvel com tempo para a imagem, a forma e a ideia.",
+  aboutTitle: "Pedro Félix",
+  aboutIntro: "Espaço reservado — atualize com o texto real sobre quem escreve o Auto Turbo.",
+  aboutBody: "",
+  aboutEmail: "redacao@autoturbo.pt",
+  aboutSocial: "",
 };
 
+type SiteSettingsRow = typeof DEFAULT_SITE_SETTINGS;
+
 // Single row (id 1) — falls back to the shipped defaults if it's ever
-// missing rather than erroring, so the homepage never renders blank.
-export async function getSiteSettings() {
+// missing rather than erroring, so the homepage/Sobre never render blank.
+export async function getSiteSettings(): Promise<SiteSettingsRow> {
   const db = await requireDb();
   const [row] = await db.select().from(siteSettings).where(eq(siteSettings.id, 1)).limit(1);
+  const key = (name: keyof SiteSettingsRow) => row?.[name] ?? DEFAULT_SITE_SETTINGS[name];
   return {
-    homeKicker: row?.homeKicker ?? DEFAULT_SITE_SETTINGS.homeKicker,
-    homeHeadline: row?.homeHeadline ?? DEFAULT_SITE_SETTINGS.homeHeadline,
-    homeSubtitle: row?.homeSubtitle ?? DEFAULT_SITE_SETTINGS.homeSubtitle,
+    homeKicker: key("homeKicker"),
+    homeHeadline: key("homeHeadline"),
+    homeSubtitle: key("homeSubtitle"),
+    aboutTitle: key("aboutTitle"),
+    aboutIntro: key("aboutIntro"),
+    aboutBody: key("aboutBody"),
+    aboutEmail: key("aboutEmail"),
+    aboutSocial: key("aboutSocial"),
   };
 }
 
-export async function updateSiteSettings(input: { homeKicker: string | null; homeHeadline: string | null; homeSubtitle: string | null }) {
+export async function updateSiteSettings(input: Partial<{ [K in keyof SiteSettingsRow]: SiteSettingsRow[K] | null }>) {
   const db = await requireDb();
   await db.insert(siteSettings).values({ id: 1, ...input }).onDuplicateKeyUpdate({ set: input });
   return getSiteSettings();

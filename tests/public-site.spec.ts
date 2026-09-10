@@ -8,8 +8,8 @@ test.describe("navegação pública — smoke", () => {
     page.on("pageerror", (err) => erros.push(err.message));
     await page.goto("/");
     const nav = page.getByRole("navigation", { name: /navegação principal/i });
-    await expect(nav.getByRole("link", { name: /notícias/i })).toBeVisible();
-    await expect(nav.getByRole("link", { name: /multimédia/i })).toBeVisible();
+    await expect(nav.getByRole("link", { name: /início/i })).toBeVisible();
+    await expect(nav.getByRole("link", { name: /ensaios/i })).toBeVisible();
     await expect(nav.getByRole("link", { name: /revista/i })).toBeVisible();
     await expect(nav.getByRole("link", { name: /sobre/i })).toBeVisible();
     expect(erros).toEqual([]);

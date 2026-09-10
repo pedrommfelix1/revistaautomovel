@@ -129,6 +129,12 @@ var siteSettings = mysqlTable("siteSettings", {
   homeKicker: varchar("homeKicker", { length: 160 }),
   homeHeadline: text("homeHeadline"),
   homeSubtitle: text("homeSubtitle"),
+  aboutTitle: varchar("aboutTitle", { length: 160 }),
+  aboutIntro: text("aboutIntro"),
+  /** Blank-line-separated paragraphs, same convention as article bodies. */
+  aboutBody: text("aboutBody"),
+  aboutEmail: varchar("aboutEmail", { length: 320 }),
+  aboutSocial: text("aboutSocial"),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
 });
 
@@ -460,15 +466,26 @@ async function replaceSiteGalleryImages(imageRows) {
 var DEFAULT_SITE_SETTINGS = {
   homeKicker: "Revista independente / N.\xBA 01",
   homeHeadline: "Autom\xF3veis para ler, n\xE3o apenas medir.",
-  homeSubtitle: "Ensaios, cultura e design autom\xF3vel com tempo para a imagem, a forma e a ideia."
+  homeSubtitle: "Ensaios, cultura e design autom\xF3vel com tempo para a imagem, a forma e a ideia.",
+  aboutTitle: "Pedro F\xE9lix",
+  aboutIntro: "Espa\xE7o reservado \u2014 atualize com o texto real sobre quem escreve o Auto Turbo.",
+  aboutBody: "",
+  aboutEmail: "redacao@autoturbo.pt",
+  aboutSocial: ""
 };
 async function getSiteSettings() {
   const db = await requireDb();
   const [row] = await db.select().from(siteSettings).where(eq(siteSettings.id, 1)).limit(1);
+  const key = (name) => row?.[name] ?? DEFAULT_SITE_SETTINGS[name];
   return {
-    homeKicker: row?.homeKicker ?? DEFAULT_SITE_SETTINGS.homeKicker,
-    homeHeadline: row?.homeHeadline ?? DEFAULT_SITE_SETTINGS.homeHeadline,
-    homeSubtitle: row?.homeSubtitle ?? DEFAULT_SITE_SETTINGS.homeSubtitle
+    homeKicker: key("homeKicker"),
+    homeHeadline: key("homeHeadline"),
+    homeSubtitle: key("homeSubtitle"),
+    aboutTitle: key("aboutTitle"),
+    aboutIntro: key("aboutIntro"),
+    aboutBody: key("aboutBody"),
+    aboutEmail: key("aboutEmail"),
+    aboutSocial: key("aboutSocial")
   };
 }
 async function updateSiteSettings(input) {
@@ -1529,7 +1546,7 @@ var editorialRouter = router({
         throw new TRPCError3({ code: "CONFLICT", message: "J\xE1 existe um artigo com este t\xEDtulo. Escolha outro nome." });
       }
       const slug = await uniqueArticleSlug(input.title);
-      return createArticle({ title: input.title, slug, authorId: ctx.user.id, authorName: ctx.user.name ?? "Autor Motor de Linha" });
+      return createArticle({ title: input.title, slug, authorId: ctx.user.id, authorName: ctx.user.name ?? "Autor Auto Turbo" });
     }),
     saveMetadata: protectedProcedure.input(metadataInput).mutation(async ({ ctx, input }) => {
       await assertCanManageArticle(ctx, input.id);
@@ -1692,10 +1709,22 @@ var homeSettingsInput = z5.object({
   homeHeadline: z5.string().max(400).nullable(),
   homeSubtitle: z5.string().max(400).nullable()
 });
+var aboutSettingsInput = z5.object({
+  aboutTitle: z5.string().max(160).nullable(),
+  aboutIntro: z5.string().max(500).nullable(),
+  aboutBody: z5.string().max(4e3).nullable(),
+  aboutEmail: z5.string().max(320).nullable(),
+  aboutSocial: z5.string().max(500).nullable()
+});
 var settingsRouter = router({
   home: publicProcedure.query(() => getSiteSettings()),
+  about: publicProcedure.query(() => getSiteSettings()),
   manage: router({
     saveHome: protectedProcedure.input(homeSettingsInput).mutation(async ({ ctx, input }) => {
+      assertCanManageSettings(ctx);
+      return updateSiteSettings(input);
+    }),
+    saveAbout: protectedProcedure.input(aboutSettingsInput).mutation(async ({ ctx, input }) => {
       assertCanManageSettings(ctx);
       return updateSiteSettings(input);
     })

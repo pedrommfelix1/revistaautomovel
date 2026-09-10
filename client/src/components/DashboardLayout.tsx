@@ -31,7 +31,7 @@ const menuItems = [
   { icon: FilePenLine, label: "Artigos", path: "/redacao" },
   { icon: Images, label: "Multimédia", path: "/redacao/multimedia" },
   { icon: BookOpen, label: "Revista", path: "/redacao/revista" },
-  { icon: LayoutTemplate, label: "Página inicial", path: "/redacao/site" },
+  { icon: LayoutTemplate, label: "Site", path: "/redacao/site" },
   { icon: KeyRound, label: "Conta", path: "/redacao/conta" },
   { icon: House, label: "Ver site", path: "/" },
 ];
@@ -192,7 +192,7 @@ function DashboardLayoutContent({
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-semibold tracking-tight truncate">
-                    Motor de Linha
+                    Auto Turbo
                   </span>
                 </div>
               ) : null}
