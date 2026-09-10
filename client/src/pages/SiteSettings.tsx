@@ -79,10 +79,6 @@ export default function SiteSettings() {
           ) : (
             <div className="mt-8 space-y-5">
               <div>
-                <Label htmlFor="home-kicker">Etiqueta</Label>
-                <Input id="home-kicker" value={homeForm.homeKicker} onChange={(event) => setHomeForm((current) => ({ ...current, homeKicker: event.target.value }))} className="editor-input" placeholder="Revista independente / N.º 01" />
-              </div>
-              <div>
                 <Label htmlFor="home-headline">Título</Label>
                 <Textarea id="home-headline" value={homeForm.homeHeadline} onChange={(event) => setHomeForm((current) => ({ ...current, homeHeadline: event.target.value }))} className="editor-input min-h-24 text-xl font-bold tracking-[-0.04em]" placeholder="Automóveis para ler, não apenas medir." />
               </div>

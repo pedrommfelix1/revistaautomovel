@@ -24,11 +24,9 @@ export function EditorialHeader() {
           {open ? <X size={20} strokeWidth={1.8} /> : <Menu size={22} strokeWidth={1.8} />}
         </button>
 
-        <Link href="/" className="group flex items-center gap-3 no-underline text-black" aria-label="Auto Turbo — início">
-          <span className="h-4 w-4 bg-[#f0372f] transition-transform duration-200 group-hover:rotate-45" />
-          <span className="leading-[0.8] tracking-[-0.09em]">
-            <span className="block text-[10px] font-bold uppercase tracking-[0.38em]">Auto</span>
-            <span className="block text-[27px] font-black uppercase tracking-[-0.105em]">Turbo</span>
+        <Link href="/" className="flex items-center no-underline text-black" aria-label="Auto Turbo — início">
+          <span className="text-2xl font-black uppercase leading-none tracking-[-0.03em] sm:text-3xl">
+            <span className="text-[#f0372f]">A</span>uto<span className="text-[#f0372f]">T</span>urbo
           </span>
         </Link>
 

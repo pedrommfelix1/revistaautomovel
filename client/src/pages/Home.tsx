@@ -41,7 +41,7 @@ export default function Home() {
       <main className="flex-1">
         <section className="editorial-shell py-8 sm:py-12">
           <div className="home-masthead border-b-2 border-black pb-6 sm:pb-8">
-            <div><p className="mb-4 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.16em]"><span className="h-3 w-3 bg-[#f0372f]" /> {homeSettings?.homeKicker}</p><h1 className="max-w-4xl text-5xl font-black leading-[0.82] tracking-[-0.03em] sm:text-7xl lg:text-8xl">{homeSettings?.homeHeadline}</h1></div>
+            <div><h1 className="max-w-4xl text-5xl font-black leading-[0.82] tracking-[-0.03em] sm:text-7xl lg:text-8xl">{homeSettings?.homeHeadline}</h1></div>
             <p className="max-w-sm self-end text-sm leading-relaxed text-neutral-600">{homeSettings?.homeSubtitle}</p>
           </div>
         </section>

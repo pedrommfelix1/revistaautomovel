@@ -15,6 +15,12 @@ test.describe("navegação pública — smoke", () => {
     expect(erros).toEqual([]);
   });
 
+  test("início não mostra a etiqueta acima do título de destaque", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByText(/revista independente/i)).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  });
+
   test("notícias mostra os dois dropdowns de filtro", async ({ page }) => {
     await page.goto("/noticias");
     await expect(page.getByLabel(/tipo de carro/i)).toBeVisible();
