@@ -15,7 +15,7 @@ export function EditorialFooter() {
           <Link href="/sobre" className="footer-link">Sobre</Link>
         </div>
       </div>
-      <div className="border-t border-white/20"><div className="editorial-shell flex flex-wrap justify-between gap-3 py-4 font-mono text-[10px] uppercase tracking-[0.12em] text-white/50"><span>© 2026 Auto Turbo</span><span>Edição editorial independente</span></div></div>
+      <div className="border-t border-white/20"><div className="editorial-shell flex flex-wrap justify-between gap-3 py-4 font-mono text-[10px] uppercase tracking-[0.12em] text-white/50"><span>© 2026 Auto Turbo · Por Pedro Félix</span><span>Edição editorial independente</span></div></div>
     </footer>
   );
 }
