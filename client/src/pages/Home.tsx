@@ -19,7 +19,6 @@ function shuffle<T>(items: T[]): T[] {
 }
 
 export default function Home() {
-  const { data: homeSettings } = trpc.settings.home.useQuery();
   const { data: featured = [], isLoading: featuredLoading } = trpc.editorial.featured.useQuery();
   const { data: latest = [] } = trpc.editorial.latest.useQuery({ limit: 9 });
   const [api, setApi] = useState<CarouselApi>();
@@ -39,14 +38,7 @@ export default function Home() {
     <div className="flex min-h-screen flex-col bg-white">
       <EditorialHeader />
       <main className="flex-1">
-        <section className="editorial-shell py-8 sm:py-12">
-          <div className="home-masthead border-b-2 border-black pb-6 sm:pb-8">
-            <div><h1 className="max-w-4xl text-5xl font-black leading-[0.82] tracking-[-0.03em] sm:text-7xl lg:text-8xl">{homeSettings?.homeHeadline}</h1></div>
-            <p className="max-w-sm self-end text-sm leading-relaxed text-neutral-600">{homeSettings?.homeSubtitle}</p>
-          </div>
-        </section>
-
-        <section className="editorial-shell">
+        <section className="editorial-shell pt-8 sm:pt-12">
           <div className="mb-7 flex items-center gap-4"><h2 className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.14em]"><span className="h-3 w-3 bg-[#f0372f]" /> Em destaque</h2></div>
           {featuredLoading ? (
             <div className="aspect-[16/8] animate-pulse bg-neutral-100" />

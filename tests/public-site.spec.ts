@@ -15,10 +15,12 @@ test.describe("navegação pública — smoke", () => {
     expect(erros).toEqual([]);
   });
 
-  test("início não mostra a etiqueta acima do título de destaque", async ({ page }) => {
+  test("início vai do header direto para os destaques, sem masthead de título", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText(/revista independente/i)).toHaveCount(0);
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByText(/automóveis para ler/i)).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveCount(0);
+    await expect(page.getByText(/em destaque/i)).toBeVisible();
   });
 
   test("notícias mostra os dois dropdowns de filtro", async ({ page }) => {
