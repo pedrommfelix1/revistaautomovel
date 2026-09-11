@@ -269,6 +269,16 @@ export async function listLatestArticles(limit: number) {
   return hydrateArticles(rows.map((article) => article.id));
 }
 
+// Lightweight — just slug/updatedAt, for the sitemap. Avoids hydrating
+// sections/images/categories for content that only ever needs a <loc>/<lastmod>.
+export async function listPublishedSlugsForSitemap() {
+  const db = await requireDb();
+  return db.select({ slug: articles.slug, updatedAt: articles.updatedAt })
+    .from(articles)
+    .where(eq(articles.status, "published"))
+    .orderBy(desc(articles.publishedAt));
+}
+
 export async function listFeaturedArticles() {
   const db = await requireDb();
   const rows = await db.select().from(articles).where(and(eq(articles.status, "published"), eq(articles.isFeatured, true))).orderBy(desc(articles.publishedAt)).limit(3);

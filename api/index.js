@@ -344,6 +344,10 @@ async function listLatestArticles(limit) {
   const rows = await db.select().from(articles).where(eq(articles.status, "published")).orderBy(desc(articles.publishedAt), desc(articles.createdAt)).limit(limit);
   return hydrateArticles(rows.map((article) => article.id));
 }
+async function listPublishedSlugsForSitemap() {
+  const db = await requireDb();
+  return db.select({ slug: articles.slug, updatedAt: articles.updatedAt }).from(articles).where(eq(articles.status, "published")).orderBy(desc(articles.publishedAt));
+}
 async function listFeaturedArticles() {
   const db = await requireDb();
   const rows = await db.select().from(articles).where(and(eq(articles.status, "published"), eq(articles.isFeatured, true))).orderBy(desc(articles.publishedAt)).limit(3);
@@ -1291,6 +1295,48 @@ function registerPasswordAuthRoutes(app2) {
   });
 }
 
+// server/_core/sitemap.ts
+function isoDate(value) {
+  return new Date(value).toISOString().slice(0, 10);
+}
+function escapeXml(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function registerSitemapRoute(app2) {
+  app2.get("/sitemap.xml", async (req, res) => {
+    try {
+      const proto = req.headers["x-forwarded-proto"] ?? req.protocol;
+      const baseUrl = `${proto}://${req.headers.host}`;
+      const today = isoDate(/* @__PURE__ */ new Date());
+      const staticEntries = [
+        { loc: "/", lastmod: today },
+        { loc: "/noticias", lastmod: today },
+        { loc: "/sobre", lastmod: today }
+      ];
+      const articles2 = await listPublishedSlugsForSitemap();
+      const articleEntries = articles2.map((article) => ({
+        loc: `/artigo/${article.slug}`,
+        lastmod: isoDate(article.updatedAt)
+      }));
+      const urls = [...staticEntries, ...articleEntries].map((entry) => `  <url>
+    <loc>${escapeXml(baseUrl + entry.loc)}</loc>
+    <lastmod>${entry.lastmod}</lastmod>
+  </url>`).join("\n");
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</urlset>
+`;
+      res.set("Content-Type", "application/xml; charset=utf-8");
+      res.set("Cache-Control", "public, max-age=3600");
+      res.send(xml);
+    } catch (error) {
+      console.error("[sitemap] failed to generate", error);
+      res.status(500).send("Internal error");
+    }
+  });
+}
+
 // server/_core/storageProxy.ts
 var PRESIGN_CACHE_TTL_MS = 45 * 60 * 1e3;
 var BROWSER_CACHE_MAX_AGE_S = 25 * 60;
@@ -1790,6 +1836,7 @@ registerStorageProxy(app);
 registerOAuthRoutes(app);
 registerPasswordAuthRoutes(app);
 registerMagazineUploadRoute(app);
+registerSitemapRoute(app);
 app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 app.use((err, _req, res, _next) => {
   console.error("[api] unhandled error:", err);

@@ -6,6 +6,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerMagazineUploadRoute } from "./magazineUpload";
 import { registerOAuthRoutes } from "./oauth";
 import { registerPasswordAuthRoutes } from "./passwordAuth";
+import { registerSitemapRoute } from "./sitemap";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -40,6 +41,7 @@ async function startServer() {
   registerOAuthRoutes(app);
   registerPasswordAuthRoutes(app);
   registerMagazineUploadRoute(app);
+  registerSitemapRoute(app);
   // tRPC API
   app.use(
     "/api/trpc",

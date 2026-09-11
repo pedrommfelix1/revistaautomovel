@@ -49,6 +49,15 @@ test.describe("navegação pública — smoke", () => {
     await expect(page.getByRole("button", { name: "Sobre", exact: true })).toBeVisible();
   });
 
+  test("sitemap.xml responde com os artigos publicados", async ({ page, request }) => {
+    const resp = await request.get("/sitemap.xml");
+    expect(resp.status()).toBe(200);
+    expect(resp.headers()["content-type"]).toContain("xml");
+    const body = await resp.text();
+    expect(body).toContain("<urlset");
+    expect(body).toContain("/sobre</loc>");
+  });
+
   test("pesquisa pede pelo menos duas letras antes de procurar", async ({ page }) => {
     await page.goto("/pesquisa");
     await expect(page.getByText(/escreva pelo menos duas letras/i)).toBeVisible();

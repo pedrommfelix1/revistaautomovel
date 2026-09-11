@@ -2,3 +2,5 @@ User-agent: *
 Allow: /
 Disallow: /redacao
 Disallow: /api/
+
+Sitemap: https://www.autoturbo.pt/sitemap.xml
