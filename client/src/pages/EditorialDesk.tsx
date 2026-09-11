@@ -18,7 +18,7 @@ export default function EditorialDesk() {
   const utils = trpc.useUtils();
   const { data: articles = [], isLoading } = trpc.editorial.manage.list.useQuery(undefined, { enabled: Boolean(user) });
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; title: string } | null>(null);
-  const newDraftTitle = () => `Rascunho ${Date.now()}`;
+  const newDraftTitle = () => `Ensaios ${Date.now()}`;
   const createArticle = trpc.editorial.manage.create.useMutation({
     onSuccess: (article) => { if (article) setLocation(`/redacao/${article.id}`); },
   });
