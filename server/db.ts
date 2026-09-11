@@ -1,6 +1,6 @@
-import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { articleCategories, articleImages, articles, articleSections, categories, InsertUser, loginAttempts, magazineIssues, siteGalleryImages, siteSettings, users } from "../drizzle/schema";
+import { analyticsEvents, articleCategories, articleImages, articles, articleSections, categories, InsertUser, loginAttempts, magazineIssues, siteGalleryImages, siteSettings, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -501,4 +501,74 @@ export async function createMagazineIssue(input: {
 export async function deleteMagazineIssue(id: number) {
   const db = await requireDb();
   await db.delete(magazineIssues).where(eq(magazineIssues.id, id));
+}
+
+export async function recordAnalyticsEvent(input: { type: "pageview" | "click"; path: string; label?: string | null; referrer?: string | null }) {
+  const db = await requireDb();
+  await db.insert(analyticsEvents).values({
+    type: input.type,
+    path: input.path.slice(0, 300),
+    label: input.label?.slice(0, 120) ?? null,
+    referrer: input.referrer?.slice(0, 300) ?? null,
+  });
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export async function getAnalyticsSummary() {
+  const db = await requireDb();
+  const now = Date.now();
+  const since24h = new Date(now - DAY_MS);
+  const since7d = new Date(now - 7 * DAY_MS);
+  const since30d = new Date(now - 30 * DAY_MS);
+
+  const countSince = async (type: "pageview" | "click", since?: Date) => {
+    const conditions = since ? and(eq(analyticsEvents.type, type), gte(analyticsEvents.createdAt, since)) : eq(analyticsEvents.type, type);
+    const [row] = await db.select({ count: sql<number>`count(*)` }).from(analyticsEvents).where(conditions);
+    return Number(row?.count ?? 0);
+  };
+
+  const [totalPageviews, last24h, last7d, last30d, totalClicks] = await Promise.all([
+    countSince("pageview"),
+    countSince("pageview", since24h),
+    countSince("pageview", since7d),
+    countSince("pageview", since30d),
+    countSince("click"),
+  ]);
+
+  const topPages = await db.select({ path: analyticsEvents.path, count: sql<number>`count(*)` })
+    .from(analyticsEvents)
+    .where(and(eq(analyticsEvents.type, "pageview"), gte(analyticsEvents.createdAt, since30d)))
+    .groupBy(analyticsEvents.path)
+    .orderBy(desc(sql`count(*)`))
+    .limit(10);
+
+  const topClicks = await db.select({ label: analyticsEvents.label, count: sql<number>`count(*)` })
+    .from(analyticsEvents)
+    .where(and(eq(analyticsEvents.type, "click"), gte(analyticsEvents.createdAt, since30d)))
+    .groupBy(analyticsEvents.label)
+    .orderBy(desc(sql`count(*)`))
+    .limit(10);
+
+  // A literal (not drizzle-Column-interpolated) fragment, so the SELECT,
+  // GROUP BY and ORDER BY clauses render byte-identical SQL text — TiDB's
+  // only_full_group_by mode rejects the query otherwise, since interpolating
+  // the Column object renders qualified in some clause positions and bare
+  // in others even when reusing the same expression object.
+  const daily = await db.select({ day: sql<string>`DATE(createdAt)`, count: sql<number>`count(*)` })
+    .from(analyticsEvents)
+    .where(and(eq(analyticsEvents.type, "pageview"), gte(analyticsEvents.createdAt, since30d)))
+    .groupBy(sql`DATE(createdAt)`)
+    .orderBy(sql`DATE(createdAt)`);
+
+  return {
+    totalPageviews,
+    last24h,
+    last7d,
+    last30d,
+    totalClicks,
+    topPages: topPages.map((row) => ({ path: row.path, count: Number(row.count) })),
+    topClicks: topClicks.map((row) => ({ label: row.label ?? "—", count: Number(row.count) })),
+    daily: daily.map((row) => ({ day: row.day, count: Number(row.count) })),
+  };
 }

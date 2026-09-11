@@ -2,6 +2,7 @@ import { COOKIE_NAME } from "../shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
+import { analyticsRouter } from "./routers/analytics";
 import { editorialRouter } from "./routers/editorial";
 import { galleryRouter } from "./routers/gallery";
 import { magazineRouter } from "./routers/magazine";
@@ -27,6 +28,7 @@ export const appRouter = router({
       } as const;
     }),
   }),
+  analytics: analyticsRouter,
   editorial: editorialRouter,
   gallery: galleryRouter,
   magazine: magazineRouter,

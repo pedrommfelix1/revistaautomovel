@@ -58,6 +58,30 @@ test.describe("navegação pública — smoke", () => {
     expect(body).toContain("/sobre</loc>");
   });
 
+  test("/api/track aceita um pageview válido e rejeita um payload inválido", async ({ request }) => {
+    const path = `/e2e-track-check-${Date.now()}`;
+    const ok = await request.post("/api/track", { data: { type: "pageview", path } });
+    expect(ok.status()).toBe(204);
+
+    const bad = await request.post("/api/track", { data: { type: "pageview", path: "sem-barra-inicial" } });
+    expect(bad.status()).toBe(400);
+
+    // No separate test DB — clean up directly rather than leaving a fake
+    // pageview polluting the real "Páginas mais vistas" table on /redacao/metricas.
+    // Playwright's test process doesn't load .env on its own, unlike the dev
+    // server (which pulls it in via dotenv/config at startup).
+    await import("dotenv/config");
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.createConnection(process.env.DATABASE_URL!);
+    await conn.query("DELETE FROM analyticsEvents WHERE path = ?", [path]);
+    await conn.end();
+  });
+
+  test("backoffice mostra Métricas ao admin", async ({ page }) => {
+    await page.goto("/redacao");
+    await expect(page.getByRole("button", { name: "Métricas", exact: true })).toBeVisible();
+  });
+
   test("pesquisa pede pelo menos duas letras antes de procurar", async ({ page }) => {
     await page.goto("/pesquisa");
     await expect(page.getByText(/escreva pelo menos duas letras/i)).toBeVisible();

@@ -1,10 +1,11 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { trackPageview } from "./lib/analytics";
 import About from "./pages/About";
 import Article from "./pages/Article";
 import Category from "./pages/Category";
@@ -13,6 +14,7 @@ import News from "./pages/News";
 import EditorialDesk from "./pages/EditorialDesk";
 import ArticleEditor from "./pages/ArticleEditor";
 import Account from "./pages/Account";
+import Analytics from "./pages/Analytics";
 import Search from "./pages/Search";
 import SiteSettings from "./pages/SiteSettings";
 
@@ -30,11 +32,23 @@ function ScrollToTop() {
   return null;
 }
 
+// Skips /redacao/* so the admin's own backoffice browsing never pollutes
+// visitor stats — only real public-site traffic gets counted.
+function PageviewTracker() {
+  const [location] = useLocation();
+  useEffect(() => {
+    if (location.startsWith("/redacao")) return;
+    trackPageview(location);
+  }, [location]);
+  return null;
+}
+
 function Router() {
   // make sure to consider if you need authentication for certain routes
   return (
     <>
       <ScrollToTop />
+      <PageviewTracker />
       <Switch>
         <Route path={"/"} component={Home} />
         <Route path={"/artigo/:slug"} component={Article} />
@@ -45,6 +59,7 @@ function Router() {
         <Route path={"/redacao"} component={EditorialDesk} />
         <Route path={"/redacao/conta"} component={Account} />
         <Route path={"/redacao/site"} component={SiteSettings} />
+        <Route path={"/redacao/metricas"} component={Analytics} />
         <Route path={"/redacao/:id"} component={ArticleEditor} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}

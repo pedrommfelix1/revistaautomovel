@@ -92,6 +92,13 @@
       "when": 1789050637370,
       "tag": "0012_lucky_agent_brand",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1789147211878,
+      "tag": "0013_striped_radioactive_man",
+      "breakpoints": true
     }
   ]
 }

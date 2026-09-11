@@ -3,6 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
+import { registerAnalyticsTrackingRoute } from "./analytics";
 import { registerMagazineUploadRoute } from "./magazineUpload";
 import { registerOAuthRoutes } from "./oauth";
 import { registerPasswordAuthRoutes } from "./passwordAuth";
@@ -42,6 +43,7 @@ async function startServer() {
   registerPasswordAuthRoutes(app);
   registerMagazineUploadRoute(app);
   registerSitemapRoute(app);
+  registerAnalyticsTrackingRoute(app);
   // tRPC API
   app.use(
     "/api/trpc",

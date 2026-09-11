@@ -10,6 +10,7 @@ import { EditorialFooter } from "@/components/EditorialFooter";
 import { EditorialHeader } from "@/components/EditorialHeader";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { useArticleHead } from "@/components/Head";
+import { trackClick } from "@/lib/analytics";
 import { trpc } from "@/lib/trpc";
 import { estimateReadingMinutes } from "../../../shared/editorial";
 
@@ -45,6 +46,7 @@ function ShareButton({ title, deck }: { title: string; deck: string | null }) {
   async function shareNative() {
     try {
       await navigator.share({ title, text: deck ?? undefined, url: shareUrl });
+      trackClick("share_native");
     } catch {
       /* user cancelled the native share sheet */
     }
@@ -68,16 +70,16 @@ function ShareButton({ title, deck }: { title: string; deck: string | null }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="rounded-none border-2 border-black">
         <DropdownMenuItem asChild>
-          <a href={`https://wa.me/?text=${encodeURIComponent(shareText)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2"><MessageCircle size={14} /> WhatsApp</a>
+          <a href={`https://wa.me/?text=${encodeURIComponent(shareText)}`} target="_blank" rel="noopener noreferrer" onClick={() => trackClick("share_whatsapp")} className="flex items-center gap-2"><MessageCircle size={14} /> WhatsApp</a>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <a href={`sms:?body=${encodeURIComponent(shareText)}`} className="flex items-center gap-2"><MessageSquare size={14} /> SMS</a>
+          <a href={`sms:?body=${encodeURIComponent(shareText)}`} onClick={() => trackClick("share_sms")} className="flex items-center gap-2"><MessageSquare size={14} /> SMS</a>
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => copyShareLink(shareUrl, "Link copiado — cola nos stories do Instagram.")} className="flex items-center gap-2"><Instagram size={14} /> Instagram</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => { copyShareLink(shareUrl, "Link copiado — cola nos stories do Instagram."); trackClick("share_instagram"); }} className="flex items-center gap-2"><Instagram size={14} /> Instagram</DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <a href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(shareUrl)}`} className="flex items-center gap-2"><Mail size={14} /> Email</a>
+          <a href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(shareUrl)}`} onClick={() => trackClick("share_email")} className="flex items-center gap-2"><Mail size={14} /> Email</a>
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => copyShareLink(shareUrl, "Link copiado.")} className="flex items-center gap-2"><Link2 size={14} /> Copiar link</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => { copyShareLink(shareUrl, "Link copiado."); trackClick("share_copy_link"); }} className="flex items-center gap-2"><Link2 size={14} /> Copiar link</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

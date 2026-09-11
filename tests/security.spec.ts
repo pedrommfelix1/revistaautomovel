@@ -37,6 +37,10 @@ test.describe("sem sessão", () => {
     );
   });
 
+  test("analytics.summary exige sessão", async () => {
+    await expectErrorCode(anon.analytics.summary.query(), "UNAUTHORIZED");
+  });
+
   test("as rotas de upload da revista exigem sessão", async () => {
     const chunk = await fetch(`${BASE_URL}/api/magazine/upload-chunk?uploadId=x&index=0`, {
       method: "POST",
@@ -92,6 +96,11 @@ test.describe("sessão autenticada, mas não administradora", () => {
       client.settings.manage.saveAbout.mutate({ aboutBody: null, aboutEmail: null, aboutEmailEnabled: true, aboutSocial: null, aboutSocialEnabled: true }),
       "FORBIDDEN",
     );
+  });
+
+  test("não pode ver as métricas", async () => {
+    const client = apiClient(await devLoginCookie("user"));
+    await expectErrorCode(client.analytics.summary.query(), "FORBIDDEN");
   });
 
   test("não pode carregar partes de PDF para a revista", async () => {

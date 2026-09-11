@@ -3,11 +3,8 @@ import "dotenv/config";
 import express2 from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 
-// server/_core/magazineUpload.ts
-import express from "express";
-
 // server/db.ts
-import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 
 // drizzle/schema.ts
@@ -139,6 +136,17 @@ var siteSettings = mysqlTable("siteSettings", {
   aboutSocialEnabled: boolean("aboutSocialEnabled").default(true).notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
 });
+var analyticsEvents = mysqlTable("analyticsEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  type: mysqlEnum("type", ["pageview", "click"]).notNull(),
+  path: varchar("path", { length: 300 }).notNull(),
+  /** Only set for type "click" — a short label like "share_whatsapp". */
+  label: varchar("label", { length: 120 }),
+  referrer: varchar("referrer", { length: 300 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull()
+}, (table) => ({
+  createdAtIdx: index("analyticsEvents_createdAt_idx").on(table.createdAt)
+}));
 
 // server/_core/env.ts
 var ENV = {
@@ -521,6 +529,73 @@ async function deleteMagazineIssue(id) {
   const db = await requireDb();
   await db.delete(magazineIssues).where(eq(magazineIssues.id, id));
 }
+async function recordAnalyticsEvent(input) {
+  const db = await requireDb();
+  await db.insert(analyticsEvents).values({
+    type: input.type,
+    path: input.path.slice(0, 300),
+    label: input.label?.slice(0, 120) ?? null,
+    referrer: input.referrer?.slice(0, 300) ?? null
+  });
+}
+var DAY_MS = 24 * 60 * 60 * 1e3;
+async function getAnalyticsSummary() {
+  const db = await requireDb();
+  const now = Date.now();
+  const since24h = new Date(now - DAY_MS);
+  const since7d = new Date(now - 7 * DAY_MS);
+  const since30d = new Date(now - 30 * DAY_MS);
+  const countSince = async (type, since) => {
+    const conditions = since ? and(eq(analyticsEvents.type, type), gte(analyticsEvents.createdAt, since)) : eq(analyticsEvents.type, type);
+    const [row] = await db.select({ count: sql`count(*)` }).from(analyticsEvents).where(conditions);
+    return Number(row?.count ?? 0);
+  };
+  const [totalPageviews, last24h, last7d, last30d, totalClicks] = await Promise.all([
+    countSince("pageview"),
+    countSince("pageview", since24h),
+    countSince("pageview", since7d),
+    countSince("pageview", since30d),
+    countSince("click")
+  ]);
+  const topPages = await db.select({ path: analyticsEvents.path, count: sql`count(*)` }).from(analyticsEvents).where(and(eq(analyticsEvents.type, "pageview"), gte(analyticsEvents.createdAt, since30d))).groupBy(analyticsEvents.path).orderBy(desc(sql`count(*)`)).limit(10);
+  const topClicks = await db.select({ label: analyticsEvents.label, count: sql`count(*)` }).from(analyticsEvents).where(and(eq(analyticsEvents.type, "click"), gte(analyticsEvents.createdAt, since30d))).groupBy(analyticsEvents.label).orderBy(desc(sql`count(*)`)).limit(10);
+  const daily = await db.select({ day: sql`DATE(createdAt)`, count: sql`count(*)` }).from(analyticsEvents).where(and(eq(analyticsEvents.type, "pageview"), gte(analyticsEvents.createdAt, since30d))).groupBy(sql`DATE(createdAt)`).orderBy(sql`DATE(createdAt)`);
+  return {
+    totalPageviews,
+    last24h,
+    last7d,
+    last30d,
+    totalClicks,
+    topPages: topPages.map((row) => ({ path: row.path, count: Number(row.count) })),
+    topClicks: topClicks.map((row) => ({ label: row.label ?? "\u2014", count: Number(row.count) })),
+    daily: daily.map((row) => ({ day: row.day, count: Number(row.count) }))
+  };
+}
+
+// server/_core/analytics.ts
+function registerAnalyticsTrackingRoute(app2) {
+  app2.post("/api/track", async (req, res) => {
+    try {
+      const body = req.body;
+      const type = body?.type === "click" ? "click" : body?.type === "pageview" ? "pageview" : null;
+      const path = typeof body?.path === "string" ? body.path : null;
+      if (!type || !path || !path.startsWith("/") || path.length > 300) {
+        res.status(400).json({ error: "invalid payload" });
+        return;
+      }
+      const label = typeof body?.label === "string" ? body.label : null;
+      const referrer = typeof body?.referrer === "string" ? body.referrer : null;
+      await recordAnalyticsEvent({ type, path, label, referrer });
+      res.status(204).end();
+    } catch (error) {
+      console.error("[analytics] failed to record event", error);
+      res.status(204).end();
+    }
+  });
+}
+
+// server/_core/magazineUpload.ts
+import express from "express";
 
 // server/storage.ts
 function getForgeConfig() {
@@ -1526,8 +1601,19 @@ var systemRouter = router({
   })
 });
 
-// server/routers/editorial.ts
+// server/routers/analytics.ts
 import { TRPCError as TRPCError3 } from "@trpc/server";
+var analyticsRouter = router({
+  summary: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== "admin") {
+      throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores podem ver as m\xE9tricas." });
+    }
+    return getAnalyticsSummary();
+  })
+});
+
+// server/routers/editorial.ts
+import { TRPCError as TRPCError4 } from "@trpc/server";
 import { z as z2 } from "zod";
 var sectionInput = z2.object({
   type: z2.enum(["paragraph", "chapter", "quote", "suggested", "image"]),
@@ -1560,10 +1646,10 @@ var metadataInput = z2.object({
 async function assertCanManageArticle(ctx, articleId) {
   const article = await findArticleById(articleId);
   if (!article) {
-    throw new TRPCError3({ code: "NOT_FOUND", message: "Artigo n\xE3o encontrado." });
+    throw new TRPCError4({ code: "NOT_FOUND", message: "Artigo n\xE3o encontrado." });
   }
   if (!canManageEditorialArticle(ctx.user, article.authorId)) {
-    throw new TRPCError3({ code: "FORBIDDEN", message: "N\xE3o tem permiss\xE3o para editar este artigo." });
+    throw new TRPCError4({ code: "FORBIDDEN", message: "N\xE3o tem permiss\xE3o para editar este artigo." });
   }
   return article;
 }
@@ -1595,7 +1681,7 @@ var editorialRouter = router({
     create: protectedProcedure.input(z2.object({ title: z2.string().min(3).max(220) })).mutation(async ({ ctx, input }) => {
       const duplicate = await findArticleByTitle(input.title);
       if (duplicate) {
-        throw new TRPCError3({ code: "CONFLICT", message: "J\xE1 existe um artigo com este t\xEDtulo. Escolha outro nome." });
+        throw new TRPCError4({ code: "CONFLICT", message: "J\xE1 existe um artigo com este t\xEDtulo. Escolha outro nome." });
       }
       const slug = await uniqueArticleSlug(input.title);
       return createArticle({ title: input.title, slug, authorId: ctx.user.id, authorName: ctx.user.name ?? "Autor Auto Turbo" });
@@ -1604,7 +1690,7 @@ var editorialRouter = router({
       await assertCanManageArticle(ctx, input.id);
       const duplicate = await findArticleByTitle(input.title, input.id);
       if (duplicate) {
-        throw new TRPCError3({ code: "CONFLICT", message: "J\xE1 existe um artigo com este t\xEDtulo. Escolha outro nome." });
+        throw new TRPCError4({ code: "CONFLICT", message: "J\xE1 existe um artigo com este t\xEDtulo. Escolha outro nome." });
       }
       const slug = await uniqueArticleSlug(input.slug || input.title, input.id);
       await updateArticleMetadata({ ...input, slug });
@@ -1633,21 +1719,21 @@ var editorialRouter = router({
     deleteDraft: protectedProcedure.input(z2.object({ id: z2.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const article = await assertCanManageArticle(ctx, input.id);
       if (article.status !== "draft") {
-        throw new TRPCError3({ code: "PRECONDITION_FAILED", message: "S\xF3 \xE9 poss\xEDvel apagar rascunhos." });
+        throw new TRPCError4({ code: "PRECONDITION_FAILED", message: "S\xF3 \xE9 poss\xEDvel apagar rascunhos." });
       }
       await deleteArticle(input.id);
       return { success: true, id: input.id };
     }),
     createCategory: protectedProcedure.input(z2.object({ name: z2.string().min(2).max(80), description: z2.string().max(240).nullable().optional(), kind: z2.enum(["tipo", "marca"]) })).mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin" && input.kind !== "marca") {
-        throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores podem criar categorias deste tipo." });
+        throw new TRPCError4({ code: "FORBIDDEN", message: "Apenas administradores podem criar categorias deste tipo." });
       }
       const slug = toEditorialSlug(input.name);
       return createCategory({ name: input.name, slug, description: input.description ?? null, kind: input.kind });
     }),
     deleteCategory: protectedProcedure.input(z2.object({ id: z2.number().int().positive() })).mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") {
-        throw new TRPCError3({ code: "FORBIDDEN", message: "Apenas administradores podem remover categorias." });
+        throw new TRPCError4({ code: "FORBIDDEN", message: "Apenas administradores podem remover categorias." });
       }
       await deleteCategory(input.id);
       return { success: true, id: input.id };
@@ -1656,12 +1742,12 @@ var editorialRouter = router({
       await assertCanManageArticle(ctx, input.id);
       const match = input.dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
       if (!match) {
-        throw new TRPCError3({ code: "BAD_REQUEST", message: "Use uma imagem JPEG, PNG ou WebP v\xE1lida." });
+        throw new TRPCError4({ code: "BAD_REQUEST", message: "Use uma imagem JPEG, PNG ou WebP v\xE1lida." });
       }
       const contentType = match[1];
       const bytes = Buffer.from(match[2], "base64");
       if (bytes.byteLength > 5e6) {
-        throw new TRPCError3({ code: "PAYLOAD_TOO_LARGE", message: "Cada imagem deve ter no m\xE1ximo 5 MB ap\xF3s otimiza\xE7\xE3o." });
+        throw new TRPCError4({ code: "PAYLOAD_TOO_LARGE", message: "Cada imagem deve ter no m\xE1ximo 5 MB ap\xF3s otimiza\xE7\xE3o." });
       }
       const ext = contentType === "image/png" ? "png" : contentType === "image/webp" ? "webp" : "jpg";
       const asset = await storagePut(`editorial/${ctx.user.id}/${input.id}-${Date.now()}-${toEditorialSlug(input.fileName) || "imagem"}.${ext}`, bytes, contentType);
@@ -1671,7 +1757,7 @@ var editorialRouter = router({
 });
 
 // server/routers/gallery.ts
-import { TRPCError as TRPCError4 } from "@trpc/server";
+import { TRPCError as TRPCError5 } from "@trpc/server";
 import { z as z3 } from "zod";
 var galleryImageInput = z3.object({
   url: z3.string().min(1).max(2e3),
@@ -1682,7 +1768,7 @@ var galleryImageInput = z3.object({
 });
 function assertCanManageGallery(ctx) {
   if (ctx.user.role !== "admin") {
-    throw new TRPCError4({ code: "FORBIDDEN", message: "Apenas administradores podem gerir a galeria do site." });
+    throw new TRPCError5({ code: "FORBIDDEN", message: "Apenas administradores podem gerir a galeria do site." });
   }
 }
 var galleryRouter = router({
@@ -1697,12 +1783,12 @@ var galleryRouter = router({
       assertCanManageGallery(ctx);
       const match = input.dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
       if (!match) {
-        throw new TRPCError4({ code: "BAD_REQUEST", message: "Use uma imagem JPEG, PNG ou WebP v\xE1lida." });
+        throw new TRPCError5({ code: "BAD_REQUEST", message: "Use uma imagem JPEG, PNG ou WebP v\xE1lida." });
       }
       const contentType = match[1];
       const bytes = Buffer.from(match[2], "base64");
       if (bytes.byteLength > 5e6) {
-        throw new TRPCError4({ code: "PAYLOAD_TOO_LARGE", message: "Cada imagem deve ter no m\xE1ximo 5 MB ap\xF3s otimiza\xE7\xE3o." });
+        throw new TRPCError5({ code: "PAYLOAD_TOO_LARGE", message: "Cada imagem deve ter no m\xE1ximo 5 MB ap\xF3s otimiza\xE7\xE3o." });
       }
       const ext = contentType === "image/png" ? "png" : contentType === "image/webp" ? "webp" : "jpg";
       const asset = await storagePut(`gallery/${ctx.user.id}-${Date.now()}-${toEditorialSlug(input.fileName) || "imagem"}.${ext}`, bytes, contentType);
@@ -1712,11 +1798,11 @@ var galleryRouter = router({
 });
 
 // server/routers/magazine.ts
-import { TRPCError as TRPCError5 } from "@trpc/server";
+import { TRPCError as TRPCError6 } from "@trpc/server";
 import { z as z4 } from "zod";
 function assertCanManageMagazine(ctx) {
   if (ctx.user.role !== "admin") {
-    throw new TRPCError5({ code: "FORBIDDEN", message: "Apenas administradores podem gerir a revista." });
+    throw new TRPCError6({ code: "FORBIDDEN", message: "Apenas administradores podem gerir a revista." });
   }
 }
 var magazineRouter = router({
@@ -1730,12 +1816,12 @@ var magazineRouter = router({
       assertCanManageMagazine(ctx);
       const match = input.dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
       if (!match) {
-        throw new TRPCError5({ code: "BAD_REQUEST", message: "Capa inv\xE1lida \u2014 tem de ser gerada a partir da primeira p\xE1gina do PDF." });
+        throw new TRPCError6({ code: "BAD_REQUEST", message: "Capa inv\xE1lida \u2014 tem de ser gerada a partir da primeira p\xE1gina do PDF." });
       }
       const contentType = match[1];
       const bytes = Buffer.from(match[2], "base64");
       if (bytes.byteLength > 3e6) {
-        throw new TRPCError5({ code: "PAYLOAD_TOO_LARGE", message: "A capa gerada excede o tamanho m\xE1ximo permitido." });
+        throw new TRPCError6({ code: "PAYLOAD_TOO_LARGE", message: "A capa gerada excede o tamanho m\xE1ximo permitido." });
       }
       const ext = contentType === "image/png" ? "png" : contentType === "image/webp" ? "webp" : "jpg";
       return storagePut(`magazine/covers/${Date.now()}-${toEditorialSlug(input.fileName) || "capa"}.${ext}`, bytes, contentType);
@@ -1749,11 +1835,11 @@ var magazineRouter = router({
 });
 
 // server/routers/settings.ts
-import { TRPCError as TRPCError6 } from "@trpc/server";
+import { TRPCError as TRPCError7 } from "@trpc/server";
 import { z as z5 } from "zod";
 function assertCanManageSettings(ctx) {
   if (ctx.user.role !== "admin") {
-    throw new TRPCError6({ code: "FORBIDDEN", message: "Apenas administradores podem editar as defini\xE7\xF5es do site." });
+    throw new TRPCError7({ code: "FORBIDDEN", message: "Apenas administradores podem editar as defini\xE7\xF5es do site." });
   }
 }
 var homeSettingsInput = z5.object({
@@ -1804,6 +1890,7 @@ var appRouter = router({
       };
     })
   }),
+  analytics: analyticsRouter,
   editorial: editorialRouter,
   gallery: galleryRouter,
   magazine: magazineRouter,
@@ -1837,6 +1924,7 @@ registerOAuthRoutes(app);
 registerPasswordAuthRoutes(app);
 registerMagazineUploadRoute(app);
 registerSitemapRoute(app);
+registerAnalyticsTrackingRoute(app);
 app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 app.use((err, _req, res, _next) => {
   console.error("[api] unhandled error:", err);

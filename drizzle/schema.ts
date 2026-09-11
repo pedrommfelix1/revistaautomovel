@@ -147,6 +147,19 @@ export const siteSettings = mysqlTable("siteSettings", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+/** One row per pageview or tracked click, for the backoffice metrics page. */
+export const analyticsEvents = mysqlTable("analyticsEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  type: mysqlEnum("type", ["pageview", "click"]).notNull(),
+  path: varchar("path", { length: 300 }).notNull(),
+  /** Only set for type "click" — a short label like "share_whatsapp". */
+  label: varchar("label", { length: 120 }),
+  referrer: varchar("referrer", { length: 300 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  createdAtIdx: index("analyticsEvents_createdAt_idx").on(table.createdAt),
+}));
+
 export type Category = typeof categories.$inferSelect;
 export type Article = typeof articles.$inferSelect;
 export type MagazineIssue = typeof magazineIssues.$inferSelect;
