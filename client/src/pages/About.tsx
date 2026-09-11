@@ -22,7 +22,7 @@ export default function About() {
           </div>
 
           {(showEmail || showSocial) && (
-            <div className="border border-black p-5">
+            <div className="self-start border border-black p-5">
               <p className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-500">Contacto</p>
               <div className="mt-4 space-y-4">
                 {showEmail && (
