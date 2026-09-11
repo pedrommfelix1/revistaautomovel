@@ -58,6 +58,15 @@ test.describe("navegação pública — smoke", () => {
     expect(body).toContain("/sobre</loc>");
   });
 
+  test("rss.xml responde com os artigos publicados", async ({ request }) => {
+    const resp = await request.get("/rss.xml");
+    expect(resp.status()).toBe(200);
+    expect(resp.headers()["content-type"]).toContain("rss+xml");
+    const body = await resp.text();
+    expect(body).toContain("<rss version=\"2.0\"");
+    expect(body).toContain("<item>");
+  });
+
   test("/api/track aceita um pageview válido e rejeita um payload inválido", async ({ request }) => {
     const path = `/e2e-track-check-${Date.now()}`;
     const ok = await request.post("/api/track", { data: { type: "pageview", path } });

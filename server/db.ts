@@ -279,6 +279,24 @@ export async function listPublishedSlugsForSitemap() {
     .orderBy(desc(articles.publishedAt));
 }
 
+// Lightweight — for the RSS feed. Same idea as the sitemap query above, just
+// with the extra fields a feed item needs (title/deck/author/date).
+export async function listPublishedArticlesForFeed(limit: number) {
+  const db = await requireDb();
+  return db.select({
+    title: articles.title,
+    articleTitle: articles.articleTitle,
+    slug: articles.slug,
+    deck: articles.deck,
+    authorName: articles.authorName,
+    publishedAt: articles.publishedAt,
+    createdAt: articles.createdAt,
+  }).from(articles)
+    .where(eq(articles.status, "published"))
+    .orderBy(desc(articles.publishedAt))
+    .limit(limit);
+}
+
 export async function listFeaturedArticles() {
   const db = await requireDb();
   const rows = await db.select().from(articles).where(and(eq(articles.status, "published"), eq(articles.isFeatured, true))).orderBy(desc(articles.publishedAt)).limit(3);

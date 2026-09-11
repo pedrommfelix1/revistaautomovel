@@ -356,6 +356,18 @@ async function listPublishedSlugsForSitemap() {
   const db = await requireDb();
   return db.select({ slug: articles.slug, updatedAt: articles.updatedAt }).from(articles).where(eq(articles.status, "published")).orderBy(desc(articles.publishedAt));
 }
+async function listPublishedArticlesForFeed(limit) {
+  const db = await requireDb();
+  return db.select({
+    title: articles.title,
+    articleTitle: articles.articleTitle,
+    slug: articles.slug,
+    deck: articles.deck,
+    authorName: articles.authorName,
+    publishedAt: articles.publishedAt,
+    createdAt: articles.createdAt
+  }).from(articles).where(eq(articles.status, "published")).orderBy(desc(articles.publishedAt)).limit(limit);
+}
 async function listFeaturedArticles() {
   const db = await requireDb();
   const rows = await db.select().from(articles).where(and(eq(articles.status, "published"), eq(articles.isFeatured, true))).orderBy(desc(articles.publishedAt)).limit(3);
@@ -1370,11 +1382,60 @@ function registerPasswordAuthRoutes(app2) {
   });
 }
 
+// server/_core/rss.ts
+function escapeXml(value) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function registerRssRoute(app2) {
+  app2.get("/rss.xml", async (req, res) => {
+    try {
+      const proto = req.headers["x-forwarded-proto"] ?? req.protocol;
+      const baseUrl = `${proto}://${req.headers.host}`;
+      const articles2 = await listPublishedArticlesForFeed(30);
+      const items = articles2.map((article) => {
+        const link = `${baseUrl}/artigo/${article.slug}`;
+        const title = article.articleTitle || article.title;
+        const pubDate = new Date(article.publishedAt ?? article.createdAt).toUTCString();
+        return [
+          "  <item>",
+          `    <title>${escapeXml(title)}</title>`,
+          `    <link>${escapeXml(link)}</link>`,
+          `    <guid>${escapeXml(link)}</guid>`,
+          `    <pubDate>${pubDate}</pubDate>`,
+          `    <author>${escapeXml(article.authorName)}</author>`,
+          article.deck ? `    <description>${escapeXml(article.deck)}</description>` : null,
+          "  </item>"
+        ].filter(Boolean).join("\n");
+      });
+      const xml = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">',
+        "<channel>",
+        "  <title>Auto Turbo</title>",
+        `  <link>${escapeXml(baseUrl)}/</link>`,
+        "  <description>Ensaios, cultura e design autom\xF3vel com uma leitura editorial cuidada.</description>",
+        "  <language>pt-pt</language>",
+        `  <atom:link href="${escapeXml(baseUrl)}/rss.xml" rel="self" type="application/rss+xml" />`,
+        ...items,
+        "</channel>",
+        "</rss>",
+        ""
+      ].join("\n");
+      res.set("Content-Type", "application/rss+xml; charset=utf-8");
+      res.set("Cache-Control", "public, max-age=3600");
+      res.send(xml);
+    } catch (error) {
+      console.error("[rss] failed to generate", error);
+      res.status(500).send("Internal error");
+    }
+  });
+}
+
 // server/_core/sitemap.ts
 function isoDate(value) {
   return new Date(value).toISOString().slice(0, 10);
 }
-function escapeXml(value) {
+function escapeXml2(value) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 function registerSitemapRoute(app2) {
@@ -1394,7 +1455,7 @@ function registerSitemapRoute(app2) {
         lastmod: isoDate(article.updatedAt)
       }));
       const urls = [...staticEntries, ...articleEntries].map((entry) => `  <url>
-    <loc>${escapeXml(baseUrl + entry.loc)}</loc>
+    <loc>${escapeXml2(baseUrl + entry.loc)}</loc>
     <lastmod>${entry.lastmod}</lastmod>
   </url>`).join("\n");
       const xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -1924,6 +1985,7 @@ registerOAuthRoutes(app);
 registerPasswordAuthRoutes(app);
 registerMagazineUploadRoute(app);
 registerSitemapRoute(app);
+registerRssRoute(app);
 registerAnalyticsTrackingRoute(app);
 app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 app.use((err, _req, res, _next) => {

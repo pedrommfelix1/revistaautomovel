@@ -6,6 +6,7 @@ import { registerAnalyticsTrackingRoute } from "./analytics";
 import { registerMagazineUploadRoute } from "./magazineUpload";
 import { registerOAuthRoutes } from "./oauth";
 import { registerPasswordAuthRoutes } from "./passwordAuth";
+import { registerRssRoute } from "./rss";
 import { registerSitemapRoute } from "./sitemap";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
@@ -42,6 +43,7 @@ registerOAuthRoutes(app);
 registerPasswordAuthRoutes(app);
 registerMagazineUploadRoute(app);
 registerSitemapRoute(app);
+registerRssRoute(app);
 registerAnalyticsTrackingRoute(app);
 app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 

@@ -1,6 +1,6 @@
 import type { inferRouterOutputs } from "@trpc/server";
 import { ArrowLeft, Clock3, Instagram, Link2, Mail, MessageCircle, MessageSquare, Newspaper, Search, Share2 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import { toast } from "sonner";
 import type { AppRouter } from "../../../server/routers";
@@ -88,6 +88,42 @@ function ShareButton({ title, deck }: { title: string; deck: string | null }) {
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 type ArticleData = NonNullable<RouterOutputs["editorial"]["bySlug"]>;
 type GalleryFrame = { url: string; caption: string | null };
+
+// Keeps the title on a single line whenever it fits — only shrinking below
+// the CSS clamp()'s size for titles too long to fit at that size, rather
+// than letting them wrap to a second line. Falls back to normal wrapping if
+// even the smallest allowed size still overflows (e.g. a very narrow screen
+// with an extremely long title).
+function ArticleTitle({ text }: { text: string }) {
+  const ref = useRef<HTMLHeadingElement>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    function fit() {
+      if (!el) return;
+      el.style.fontSize = "";
+      el.style.whiteSpace = "nowrap";
+      const naturalSize = parseFloat(getComputedStyle(el).fontSize);
+      const minSize = naturalSize * 0.4;
+      let size = naturalSize;
+      while (el.scrollWidth > el.clientWidth && size > minSize) {
+        size -= 1;
+        el.style.fontSize = `${size}px`;
+      }
+      if (el.scrollWidth > el.clientWidth) {
+        el.style.whiteSpace = "normal";
+      }
+    }
+
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [text]);
+
+  return <h1 ref={ref}>{text}</h1>;
+}
 
 function formatFullDate(value: Date | string | null) {
   if (!value) return "Edição Auto Turbo";
@@ -305,7 +341,7 @@ export default function Article() {
           <div className={`article-layout mt-8 border-t-2 border-black pt-5 sm:mt-11 sm:pt-7 ${magazine ? "article-layout--magazine" : ""}`}>
             <div className="article-title-area">
               {article.categories.length > 0 && <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-bold uppercase tracking-[0.14em]"><span className="text-[#f0372f]">{article.categories.map((category) => category.name).join(" / ")}</span></div>}
-              <h1>{article.articleTitle || article.title}</h1>
+              <ArticleTitle key={magazine ? "magazine" : "reading"} text={article.articleTitle || article.title} />
               {article.deck && <p className="article-deck">{article.deck}</p>}
               <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-black pt-4 text-[10px] font-bold uppercase tracking-[0.11em] text-neutral-600">
                 <span>Por <strong className="text-black">{article.authorName}</strong></span>
