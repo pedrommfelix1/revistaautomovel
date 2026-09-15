@@ -147,17 +147,24 @@ export const siteSettings = mysqlTable("siteSettings", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-/** One row per pageview or tracked click, for the backoffice metrics page. */
+/** One row per pageview, tracked click, or page-exit timing, for the backoffice metrics page. */
 export const analyticsEvents = mysqlTable("analyticsEvents", {
   id: int("id").autoincrement().primaryKey(),
-  type: mysqlEnum("type", ["pageview", "click"]).notNull(),
+  type: mysqlEnum("type", ["pageview", "click", "timing"]).notNull(),
   path: varchar("path", { length: 300 }).notNull(),
   /** Only set for type "click" — a short label like "share_whatsapp". */
   label: varchar("label", { length: 120 }),
+  /** Only set for type "timing" — milliseconds spent on `path` before leaving. */
+  durationMs: int("durationMs"),
   referrer: varchar("referrer", { length: 300 }),
+  /** Random ID kept in localStorage, no PII — lets "reach" count distinct visitors. */
+  visitorId: varchar("visitorId", { length: 40 }),
+  /** Random ID kept in sessionStorage — one browser tab's visit, for bounce rate / articles-per-visit. */
+  sessionId: varchar("sessionId", { length: 40 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => ({
   createdAtIdx: index("analyticsEvents_createdAt_idx").on(table.createdAt),
+  sessionIdIdx: index("analyticsEvents_sessionId_idx").on(table.sessionId),
 }));
 
 export type Category = typeof categories.$inferSelect;

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { analyticsEvents, articleCategories, articleImages, articles, articleSections, categories, InsertUser, loginAttempts, magazineIssues, siteGalleryImages, siteSettings, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -521,13 +521,24 @@ export async function deleteMagazineIssue(id: number) {
   await db.delete(magazineIssues).where(eq(magazineIssues.id, id));
 }
 
-export async function recordAnalyticsEvent(input: { type: "pageview" | "click"; path: string; label?: string | null; referrer?: string | null }) {
+export async function recordAnalyticsEvent(input: {
+  type: "pageview" | "click" | "timing";
+  path: string;
+  label?: string | null;
+  referrer?: string | null;
+  visitorId?: string | null;
+  sessionId?: string | null;
+  durationMs?: number | null;
+}) {
   const db = await requireDb();
   await db.insert(analyticsEvents).values({
     type: input.type,
     path: input.path.slice(0, 300),
     label: input.label?.slice(0, 120) ?? null,
     referrer: input.referrer?.slice(0, 300) ?? null,
+    visitorId: input.visitorId?.slice(0, 40) ?? null,
+    sessionId: input.sessionId?.slice(0, 40) ?? null,
+    durationMs: input.durationMs != null && Number.isFinite(input.durationMs) ? Math.round(input.durationMs) : null,
   });
 }
 
@@ -540,18 +551,32 @@ export async function getAnalyticsSummary() {
   const since7d = new Date(now - 7 * DAY_MS);
   const since30d = new Date(now - 30 * DAY_MS);
 
-  const countSince = async (type: "pageview" | "click", since?: Date) => {
+  const countSince = async (type: "pageview" | "click" | "timing", since?: Date) => {
     const conditions = since ? and(eq(analyticsEvents.type, type), gte(analyticsEvents.createdAt, since)) : eq(analyticsEvents.type, type);
     const [row] = await db.select({ count: sql<number>`count(*)` }).from(analyticsEvents).where(conditions);
     return Number(row?.count ?? 0);
   };
 
-  const [totalPageviews, last24h, last7d, last30d, totalClicks] = await Promise.all([
+  // Distinct visitorId among pageviews — "alcance" (reach), as opposed to
+  // "visualizações" (total pageviews, which counts repeat visits too).
+  const uniqueVisitorsSince = async (since?: Date) => {
+    const conditions = since
+      ? and(eq(analyticsEvents.type, "pageview"), isNotNull(analyticsEvents.visitorId), gte(analyticsEvents.createdAt, since))
+      : and(eq(analyticsEvents.type, "pageview"), isNotNull(analyticsEvents.visitorId));
+    const [row] = await db.select({ count: sql<number>`count(distinct ${analyticsEvents.visitorId})` }).from(analyticsEvents).where(conditions);
+    return Number(row?.count ?? 0);
+  };
+
+  const [totalPageviews, last24h, last7d, last30d, totalClicks, reach24h, reach7d, reach30d, reachTotal] = await Promise.all([
     countSince("pageview"),
     countSince("pageview", since24h),
     countSince("pageview", since7d),
     countSince("pageview", since30d),
     countSince("click"),
+    uniqueVisitorsSince(since24h),
+    uniqueVisitorsSince(since7d),
+    uniqueVisitorsSince(since30d),
+    uniqueVisitorsSince(),
   ]);
 
   const topPages = await db.select({ path: analyticsEvents.path, count: sql<number>`count(*)` })
@@ -579,12 +604,57 @@ export async function getAnalyticsSummary() {
     .groupBy(sql`DATE(createdAt)`)
     .orderBy(sql`DATE(createdAt)`);
 
+  // Average time on article pages (last 30 days), in whole seconds.
+  const [avgDurationRow] = await db.select({ avgMs: sql<number | null>`avg(${analyticsEvents.durationMs})` })
+    .from(analyticsEvents)
+    .where(and(eq(analyticsEvents.type, "timing"), sql`${analyticsEvents.path} LIKE '/artigo/%'`, gte(analyticsEvents.createdAt, since30d)));
+  const avgArticleReadSeconds = avgDurationRow?.avgMs ? Math.round(Number(avgDurationRow.avgMs) / 1000) : 0;
+
+  // Share click-through rate (last 30 days) — share-menu clicks over article pageviews.
+  const [shareClicksRow] = await db.select({ count: sql<number>`count(*)` })
+    .from(analyticsEvents)
+    .where(and(eq(analyticsEvents.type, "click"), sql`${analyticsEvents.label} LIKE 'share\\_%'`, gte(analyticsEvents.createdAt, since30d)));
+  const [articlePageviewsRow] = await db.select({ count: sql<number>`count(*)` })
+    .from(analyticsEvents)
+    .where(and(eq(analyticsEvents.type, "pageview"), sql`${analyticsEvents.path} LIKE '/artigo/%'`, gte(analyticsEvents.createdAt, since30d)));
+  const articlePageviews30d = Number(articlePageviewsRow?.count ?? 0);
+  const shareClickRate = articlePageviews30d > 0 ? (Number(shareClicksRow?.count ?? 0) / articlePageviews30d) * 100 : 0;
+
+  // Articles-per-visit and bounce rate both need pageviews grouped by
+  // session first — a derived-table query, since that grouping isn't a
+  // single flat aggregate.
+  const [sessionStatsRows] = await db.execute(sql`
+    SELECT
+      AVG(article_count) AS avgArticlesPerVisit,
+      SUM(CASE WHEN pv_count = 1 THEN 1 ELSE 0 END) / COUNT(*) * 100 AS bounceRate
+    FROM (
+      SELECT
+        sessionId,
+        COUNT(*) AS pv_count,
+        COUNT(DISTINCT CASE WHEN path LIKE '/artigo/%' THEN path END) AS article_count
+      FROM analyticsEvents
+      WHERE type = 'pageview' AND sessionId IS NOT NULL AND createdAt >= ${since30d}
+      GROUP BY sessionId
+    ) t
+  `) as unknown as [Array<{ avgArticlesPerVisit: string | null; bounceRate: string | null }>, unknown];
+  const sessionStats = sessionStatsRows[0];
+  const avgArticlesPerVisit = sessionStats?.avgArticlesPerVisit ? Number(sessionStats.avgArticlesPerVisit) : 0;
+  const bounceRate = sessionStats?.bounceRate ? Number(sessionStats.bounceRate) : 0;
+
   return {
     totalPageviews,
     last24h,
     last7d,
     last30d,
     totalClicks,
+    reach24h,
+    reach7d,
+    reach30d,
+    reachTotal,
+    avgArticleReadSeconds,
+    shareClickRate,
+    avgArticlesPerVisit,
+    bounceRate,
     topPages: topPages.map((row) => ({ path: row.path, count: Number(row.count) })),
     topClicks: topClicks.map((row) => ({ label: row.label ?? "—", count: Number(row.count) })),
     daily: daily.map((row) => ({ day: row.day, count: Number(row.count) })),

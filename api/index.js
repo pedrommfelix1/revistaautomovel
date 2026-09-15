@@ -4,7 +4,7 @@ import express2 from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 
 // server/db.ts
-import { and, asc, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 
 // drizzle/schema.ts
@@ -138,14 +138,21 @@ var siteSettings = mysqlTable("siteSettings", {
 });
 var analyticsEvents = mysqlTable("analyticsEvents", {
   id: int("id").autoincrement().primaryKey(),
-  type: mysqlEnum("type", ["pageview", "click"]).notNull(),
+  type: mysqlEnum("type", ["pageview", "click", "timing"]).notNull(),
   path: varchar("path", { length: 300 }).notNull(),
   /** Only set for type "click" — a short label like "share_whatsapp". */
   label: varchar("label", { length: 120 }),
+  /** Only set for type "timing" — milliseconds spent on `path` before leaving. */
+  durationMs: int("durationMs"),
   referrer: varchar("referrer", { length: 300 }),
+  /** Random ID kept in localStorage, no PII — lets "reach" count distinct visitors. */
+  visitorId: varchar("visitorId", { length: 40 }),
+  /** Random ID kept in sessionStorage — one browser tab's visit, for bounce rate / articles-per-visit. */
+  sessionId: varchar("sessionId", { length: 40 }),
   createdAt: timestamp("createdAt").defaultNow().notNull()
 }, (table) => ({
-  createdAtIdx: index("analyticsEvents_createdAt_idx").on(table.createdAt)
+  createdAtIdx: index("analyticsEvents_createdAt_idx").on(table.createdAt),
+  sessionIdIdx: index("analyticsEvents_sessionId_idx").on(table.sessionId)
 }));
 
 // server/_core/env.ts
@@ -547,7 +554,10 @@ async function recordAnalyticsEvent(input) {
     type: input.type,
     path: input.path.slice(0, 300),
     label: input.label?.slice(0, 120) ?? null,
-    referrer: input.referrer?.slice(0, 300) ?? null
+    referrer: input.referrer?.slice(0, 300) ?? null,
+    visitorId: input.visitorId?.slice(0, 40) ?? null,
+    sessionId: input.sessionId?.slice(0, 40) ?? null,
+    durationMs: input.durationMs != null && Number.isFinite(input.durationMs) ? Math.round(input.durationMs) : null
   });
 }
 var DAY_MS = 24 * 60 * 60 * 1e3;
@@ -562,22 +572,62 @@ async function getAnalyticsSummary() {
     const [row] = await db.select({ count: sql`count(*)` }).from(analyticsEvents).where(conditions);
     return Number(row?.count ?? 0);
   };
-  const [totalPageviews, last24h, last7d, last30d, totalClicks] = await Promise.all([
+  const uniqueVisitorsSince = async (since) => {
+    const conditions = since ? and(eq(analyticsEvents.type, "pageview"), isNotNull(analyticsEvents.visitorId), gte(analyticsEvents.createdAt, since)) : and(eq(analyticsEvents.type, "pageview"), isNotNull(analyticsEvents.visitorId));
+    const [row] = await db.select({ count: sql`count(distinct ${analyticsEvents.visitorId})` }).from(analyticsEvents).where(conditions);
+    return Number(row?.count ?? 0);
+  };
+  const [totalPageviews, last24h, last7d, last30d, totalClicks, reach24h, reach7d, reach30d, reachTotal] = await Promise.all([
     countSince("pageview"),
     countSince("pageview", since24h),
     countSince("pageview", since7d),
     countSince("pageview", since30d),
-    countSince("click")
+    countSince("click"),
+    uniqueVisitorsSince(since24h),
+    uniqueVisitorsSince(since7d),
+    uniqueVisitorsSince(since30d),
+    uniqueVisitorsSince()
   ]);
   const topPages = await db.select({ path: analyticsEvents.path, count: sql`count(*)` }).from(analyticsEvents).where(and(eq(analyticsEvents.type, "pageview"), gte(analyticsEvents.createdAt, since30d))).groupBy(analyticsEvents.path).orderBy(desc(sql`count(*)`)).limit(10);
   const topClicks = await db.select({ label: analyticsEvents.label, count: sql`count(*)` }).from(analyticsEvents).where(and(eq(analyticsEvents.type, "click"), gte(analyticsEvents.createdAt, since30d))).groupBy(analyticsEvents.label).orderBy(desc(sql`count(*)`)).limit(10);
   const daily = await db.select({ day: sql`DATE(createdAt)`, count: sql`count(*)` }).from(analyticsEvents).where(and(eq(analyticsEvents.type, "pageview"), gte(analyticsEvents.createdAt, since30d))).groupBy(sql`DATE(createdAt)`).orderBy(sql`DATE(createdAt)`);
+  const [avgDurationRow] = await db.select({ avgMs: sql`avg(${analyticsEvents.durationMs})` }).from(analyticsEvents).where(and(eq(analyticsEvents.type, "timing"), sql`${analyticsEvents.path} LIKE '/artigo/%'`, gte(analyticsEvents.createdAt, since30d)));
+  const avgArticleReadSeconds = avgDurationRow?.avgMs ? Math.round(Number(avgDurationRow.avgMs) / 1e3) : 0;
+  const [shareClicksRow] = await db.select({ count: sql`count(*)` }).from(analyticsEvents).where(and(eq(analyticsEvents.type, "click"), sql`${analyticsEvents.label} LIKE 'share\\_%'`, gte(analyticsEvents.createdAt, since30d)));
+  const [articlePageviewsRow] = await db.select({ count: sql`count(*)` }).from(analyticsEvents).where(and(eq(analyticsEvents.type, "pageview"), sql`${analyticsEvents.path} LIKE '/artigo/%'`, gte(analyticsEvents.createdAt, since30d)));
+  const articlePageviews30d = Number(articlePageviewsRow?.count ?? 0);
+  const shareClickRate = articlePageviews30d > 0 ? Number(shareClicksRow?.count ?? 0) / articlePageviews30d * 100 : 0;
+  const [sessionStatsRows] = await db.execute(sql`
+    SELECT
+      AVG(article_count) AS avgArticlesPerVisit,
+      SUM(CASE WHEN pv_count = 1 THEN 1 ELSE 0 END) / COUNT(*) * 100 AS bounceRate
+    FROM (
+      SELECT
+        sessionId,
+        COUNT(*) AS pv_count,
+        COUNT(DISTINCT CASE WHEN path LIKE '/artigo/%' THEN path END) AS article_count
+      FROM analyticsEvents
+      WHERE type = 'pageview' AND sessionId IS NOT NULL AND createdAt >= ${since30d}
+      GROUP BY sessionId
+    ) t
+  `);
+  const sessionStats = sessionStatsRows[0];
+  const avgArticlesPerVisit = sessionStats?.avgArticlesPerVisit ? Number(sessionStats.avgArticlesPerVisit) : 0;
+  const bounceRate = sessionStats?.bounceRate ? Number(sessionStats.bounceRate) : 0;
   return {
     totalPageviews,
     last24h,
     last7d,
     last30d,
     totalClicks,
+    reach24h,
+    reach7d,
+    reach30d,
+    reachTotal,
+    avgArticleReadSeconds,
+    shareClickRate,
+    avgArticlesPerVisit,
+    bounceRate,
     topPages: topPages.map((row) => ({ path: row.path, count: Number(row.count) })),
     topClicks: topClicks.map((row) => ({ label: row.label ?? "\u2014", count: Number(row.count) })),
     daily: daily.map((row) => ({ day: row.day, count: Number(row.count) }))
@@ -589,7 +639,8 @@ function registerAnalyticsTrackingRoute(app2) {
   app2.post("/api/track", async (req, res) => {
     try {
       const body = req.body;
-      const type = body?.type === "click" ? "click" : body?.type === "pageview" ? "pageview" : null;
+      const rawType = body?.type;
+      const type = rawType === "click" || rawType === "pageview" || rawType === "timing" ? rawType : null;
       const path = typeof body?.path === "string" ? body.path : null;
       if (!type || !path || !path.startsWith("/") || path.length > 300) {
         res.status(400).json({ error: "invalid payload" });
@@ -597,7 +648,10 @@ function registerAnalyticsTrackingRoute(app2) {
       }
       const label = typeof body?.label === "string" ? body.label : null;
       const referrer = typeof body?.referrer === "string" ? body.referrer : null;
-      await recordAnalyticsEvent({ type, path, label, referrer });
+      const visitorId = typeof body?.visitorId === "string" ? body.visitorId : null;
+      const sessionId = typeof body?.sessionId === "string" ? body.sessionId : null;
+      const durationMs = typeof body?.durationMs === "number" ? body.durationMs : null;
+      await recordAnalyticsEvent({ type, path, label, referrer, visitorId, sessionId, durationMs });
       res.status(204).end();
     } catch (error) {
       console.error("[analytics] failed to record event", error);

@@ -2,13 +2,24 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
 
-function StatTile({ label, value }: { label: string; value: number }) {
+function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="border border-black p-4">
       <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-neutral-500">{label}</p>
-      <p className="mt-3 text-3xl font-black tracking-[-0.07em]">{value.toLocaleString("pt-PT")}</p>
+      <p className="mt-3 text-3xl font-black tracking-[-0.07em]">{value}</p>
     </div>
   );
+}
+
+function formatSeconds(totalSeconds: number): string {
+  if (totalSeconds <= 0) return "—";
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+}
+
+function formatPercent(value: number): string {
+  return `${value.toFixed(1)}%`;
 }
 
 const CHART_HEIGHT_PX = 160;
@@ -61,19 +72,42 @@ export default function Analytics() {
       <div className="mx-auto max-w-6xl space-y-10 pb-12">
         <div className="border-b-2 border-black pb-5">
           <h1 className="text-3xl font-black tracking-[-0.07em] sm:text-4xl">Métricas</h1>
-          <p className="mt-2 text-xs text-neutral-500">Visitas e cliques no site público. Não conta a tua navegação aqui na redação.</p>
+          <p className="mt-2 text-xs text-neutral-500">Visitas, alcance e engagement no site público. Não conta a tua navegação aqui na redação.</p>
         </div>
 
         {isLoading || !data ? (
           <p className="font-mono text-xs uppercase tracking-[0.13em]">A carregar…</p>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-              <StatTile label="Visitas 24h" value={data.last24h} />
-              <StatTile label="Visitas 7 dias" value={data.last7d} />
-              <StatTile label="Visitas 30 dias" value={data.last30d} />
-              <StatTile label="Visitas totais" value={data.totalPageviews} />
-              <StatTile label="Cliques totais" value={data.totalClicks} />
+            <div>
+              <h2 className="mb-4 text-[11px] font-bold uppercase tracking-[0.14em]">Visualizações</h2>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <StatTile label="24h" value={data.last24h.toLocaleString("pt-PT")} />
+                <StatTile label="7 dias" value={data.last7d.toLocaleString("pt-PT")} />
+                <StatTile label="30 dias" value={data.last30d.toLocaleString("pt-PT")} />
+                <StatTile label="Totais" value={data.totalPageviews.toLocaleString("pt-PT")} />
+              </div>
+            </div>
+
+            <div>
+              <h2 className="mb-4 text-[11px] font-bold uppercase tracking-[0.14em]">Alcance (visitantes únicos)</h2>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <StatTile label="24h" value={data.reach24h.toLocaleString("pt-PT")} />
+                <StatTile label="7 dias" value={data.reach7d.toLocaleString("pt-PT")} />
+                <StatTile label="30 dias" value={data.reach30d.toLocaleString("pt-PT")} />
+                <StatTile label="Totais" value={data.reachTotal.toLocaleString("pt-PT")} />
+              </div>
+            </div>
+
+            <div>
+              <h2 className="mb-4 text-[11px] font-bold uppercase tracking-[0.14em]">Engagement (últimos 30 dias)</h2>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+                <StatTile label="Tempo médio no artigo" value={formatSeconds(data.avgArticleReadSeconds)} />
+                <StatTile label="Taxa de cliques em partilhar" value={formatPercent(data.shareClickRate)} />
+                <StatTile label="Artigos por visita" value={data.avgArticlesPerVisit.toFixed(1)} />
+                <StatTile label="Taxa de rejeição" value={formatPercent(data.bounceRate)} />
+                <StatTile label="Cliques totais" value={data.totalClicks.toLocaleString("pt-PT")} />
+              </div>
             </div>
 
             <div>

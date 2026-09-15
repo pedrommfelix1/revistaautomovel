@@ -86,6 +86,29 @@ test.describe("navegação pública — smoke", () => {
     await conn.end();
   });
 
+  test("/api/track aceita eventos de timing com visitorId/sessionId, e o resumo reflete o alcance", async ({ request }) => {
+    const visitorId = `e2e-visitor-${Date.now()}`;
+    const sessionId = `e2e-session-${Date.now()}`;
+    const path = `/e2e-timing-check-${Date.now()}`;
+
+    const pv = await request.post("/api/track", { data: { type: "pageview", path, visitorId, sessionId } });
+    expect(pv.status()).toBe(204);
+    const timing = await request.post("/api/track", { data: { type: "timing", path, durationMs: 12345, visitorId, sessionId } });
+    expect(timing.status()).toBe(204);
+
+    const admin = apiClient(await devLoginCookie("admin"));
+    const summary = await admin.analytics.summary.query();
+    expect(summary.reach24h).toBeGreaterThan(0);
+    expect(typeof summary.avgArticlesPerVisit).toBe("number");
+    expect(typeof summary.bounceRate).toBe("number");
+
+    await import("dotenv/config");
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.createConnection(process.env.DATABASE_URL!);
+    await conn.query("DELETE FROM analyticsEvents WHERE visitorId = ?", [visitorId]);
+    await conn.end();
+  });
+
   test("backoffice mostra Métricas ao admin", async ({ page }) => {
     await page.goto("/redacao");
     await expect(page.getByRole("button", { name: "Métricas", exact: true })).toBeVisible();

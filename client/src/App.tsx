@@ -1,11 +1,11 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { trackPageview } from "./lib/analytics";
+import { trackPageview, trackTiming } from "./lib/analytics";
 import About from "./pages/About";
 import Article from "./pages/Article";
 import Category from "./pages/Category";
@@ -33,13 +33,39 @@ function ScrollToTop() {
 }
 
 // Skips /redacao/* so the admin's own backoffice browsing never pollutes
-// visitor stats — only real public-site traffic gets counted.
+// visitor stats — only real public-site traffic gets counted. Also times
+// how long each page stays open, for "tempo médio no artigo": the effect
+// cleanup catches an in-app route change, and pagehide catches a tab close
+// or full navigation away (where React never gets to run cleanup).
 function PageviewTracker() {
   const [location] = useLocation();
+  const entryRef = useRef<{ path: string; time: number } | null>(null);
+
   useEffect(() => {
-    if (location.startsWith("/redacao")) return;
+    if (location.startsWith("/redacao")) {
+      entryRef.current = null;
+      return;
+    }
     trackPageview(location);
+    entryRef.current = { path: location, time: Date.now() };
+    return () => {
+      const entry = entryRef.current;
+      if (entry) trackTiming(entry.path, Date.now() - entry.time);
+    };
   }, [location]);
+
+  useEffect(() => {
+    function handlePageHide() {
+      const entry = entryRef.current;
+      if (entry) {
+        trackTiming(entry.path, Date.now() - entry.time);
+        entryRef.current = null;
+      }
+    }
+    window.addEventListener("pagehide", handlePageHide);
+    return () => window.removeEventListener("pagehide", handlePageHide);
+  }, []);
+
   return null;
 }
 
