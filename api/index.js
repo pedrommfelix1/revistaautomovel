@@ -59,7 +59,9 @@ var articles = mysqlTable("articles", {
   articleTitle: varchar("articleTitle", { length: 220 }),
   slug: varchar("slug", { length: 180 }).notNull().unique(),
   deck: text("deck"),
-  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "scheduled", "published"]).default("draft").notNull(),
+  /** Only set when status is "scheduled" — the cron in server/_core/cron.ts flips it to published once this passes. */
+  scheduledAt: timestamp("scheduledAt"),
   authorId: int("authorId").references(() => users.id, { onDelete: "set null" }),
   authorName: varchar("authorName", { length: 120 }).notNull(),
   coverImageUrl: text("coverImageUrl"),
@@ -164,7 +166,8 @@ var ENV = {
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? ""
+  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  cronSecret: process.env.CRON_SECRET ?? ""
 };
 
 // server/db.ts
@@ -472,8 +475,29 @@ async function setArticleStatus(articleId, status) {
   const db = await requireDb();
   await db.update(articles).set({
     status,
-    publishedAt: status === "published" ? /* @__PURE__ */ new Date() : null
+    publishedAt: status === "published" ? /* @__PURE__ */ new Date() : null,
+    scheduledAt: null
   }).where(eq(articles.id, articleId));
+}
+async function scheduleArticle(articleId, scheduledAt) {
+  const db = await requireDb();
+  await db.update(articles).set({
+    status: "scheduled",
+    scheduledAt,
+    publishedAt: null
+  }).where(eq(articles.id, articleId));
+}
+async function publishDueScheduledArticles() {
+  const db = await requireDb();
+  const now = /* @__PURE__ */ new Date();
+  const due = await db.select({ id: articles.id }).from(articles).where(and(eq(articles.status, "scheduled"), sql`${articles.scheduledAt} <= ${now}`));
+  if (!due.length) return 0;
+  await db.update(articles).set({
+    status: "published",
+    publishedAt: now,
+    scheduledAt: null
+  }).where(and(eq(articles.status, "scheduled"), sql`${articles.scheduledAt} <= ${now}`));
+  return due.length;
 }
 async function deleteArticle(articleId) {
   const db = await requireDb();
@@ -656,6 +680,26 @@ function registerAnalyticsTrackingRoute(app2) {
     } catch (error) {
       console.error("[analytics] failed to record event", error);
       res.status(204).end();
+    }
+  });
+}
+
+// server/_core/cron.ts
+function registerCronRoute(app2) {
+  app2.get("/api/cron/publish-scheduled", async (req, res) => {
+    if (ENV.isProduction) {
+      const expected = `Bearer ${ENV.cronSecret}`;
+      if (!ENV.cronSecret || req.headers.authorization !== expected) {
+        res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+    }
+    try {
+      const published = await publishDueScheduledArticles();
+      res.json({ ok: true, published });
+    } catch (error) {
+      console.error("[cron] failed to publish scheduled articles", error);
+      res.status(500).json({ ok: false });
     }
   });
 }
@@ -1831,10 +1875,18 @@ var editorialRouter = router({
       await setArticleStatus(input.id, input.published ? "published" : "draft");
       return getArticleWithContent(input.id);
     }),
+    schedule: protectedProcedure.input(z2.object({ id: z2.number().int().positive(), scheduledAt: z2.coerce.date() })).mutation(async ({ ctx, input }) => {
+      await assertCanManageArticle(ctx, input.id);
+      if (input.scheduledAt.getTime() <= Date.now()) {
+        throw new TRPCError4({ code: "BAD_REQUEST", message: "A data de agendamento tem de ser no futuro." });
+      }
+      await scheduleArticle(input.id, input.scheduledAt);
+      return getArticleWithContent(input.id);
+    }),
     deleteDraft: protectedProcedure.input(z2.object({ id: z2.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const article = await assertCanManageArticle(ctx, input.id);
-      if (article.status !== "draft") {
-        throw new TRPCError4({ code: "PRECONDITION_FAILED", message: "S\xF3 \xE9 poss\xEDvel apagar rascunhos." });
+      if (article.status === "published") {
+        throw new TRPCError4({ code: "PRECONDITION_FAILED", message: "S\xF3 \xE9 poss\xEDvel apagar rascunhos ou artigos agendados." });
       }
       await deleteArticle(input.id);
       return { success: true, id: input.id };
@@ -2041,6 +2093,7 @@ registerMagazineUploadRoute(app);
 registerSitemapRoute(app);
 registerRssRoute(app);
 registerAnalyticsTrackingRoute(app);
+registerCronRoute(app);
 app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 app.use((err, _req, res, _next) => {
   console.error("[api] unhandled error:", err);

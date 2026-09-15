@@ -420,7 +420,35 @@ export async function setArticleStatus(articleId: number, status: "draft" | "pub
   await db.update(articles).set({
     status,
     publishedAt: status === "published" ? new Date() : null,
+    scheduledAt: null,
   }).where(eq(articles.id, articleId));
+}
+
+export async function scheduleArticle(articleId: number, scheduledAt: Date) {
+  const db = await requireDb();
+  await db.update(articles).set({
+    status: "scheduled",
+    scheduledAt,
+    publishedAt: null,
+  }).where(eq(articles.id, articleId));
+}
+
+// Called by the daily cron (server/_core/cron.ts) — publishes anything whose
+// scheduled date has arrived. Runs once a day (Vercel Hobby plan's cron
+// minimum interval), so "schedule for day X" means "goes live sometime that
+// day", not at an exact hour.
+export async function publishDueScheduledArticles(): Promise<number> {
+  const db = await requireDb();
+  const now = new Date();
+  const due = await db.select({ id: articles.id }).from(articles)
+    .where(and(eq(articles.status, "scheduled"), sql`${articles.scheduledAt} <= ${now}`));
+  if (!due.length) return 0;
+  await db.update(articles).set({
+    status: "published",
+    publishedAt: now,
+    scheduledAt: null,
+  }).where(and(eq(articles.status, "scheduled"), sql`${articles.scheduledAt} <= ${now}`));
+  return due.length;
 }
 
 export async function deleteArticle(articleId: number) {

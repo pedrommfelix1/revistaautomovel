@@ -62,7 +62,9 @@ export const articles = mysqlTable("articles", {
   articleTitle: varchar("articleTitle", { length: 220 }),
   slug: varchar("slug", { length: 180 }).notNull().unique(),
   deck: text("deck"),
-  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "scheduled", "published"]).default("draft").notNull(),
+  /** Only set when status is "scheduled" — the cron in server/_core/cron.ts flips it to published once this passes. */
+  scheduledAt: timestamp("scheduledAt"),
   authorId: int("authorId").references(() => users.id, { onDelete: "set null" }),
   authorName: varchar("authorName", { length: 120 }).notNull(),
   coverImageUrl: text("coverImageUrl"),

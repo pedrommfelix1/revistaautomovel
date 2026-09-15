@@ -4,6 +4,9 @@
   "functions": {
     "api/index.js": { "maxDuration": 60 }
   },
+  "crons": [
+    { "path": "/api/cron/publish-scheduled", "schedule": "0 6 * * *" }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/manus-storage/(.*)", "destination": "/api/index" },

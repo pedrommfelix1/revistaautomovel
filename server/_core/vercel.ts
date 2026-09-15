@@ -3,6 +3,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import type { IncomingMessage, ServerResponse } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerAnalyticsTrackingRoute } from "./analytics";
+import { registerCronRoute } from "./cron";
 import { registerMagazineUploadRoute } from "./magazineUpload";
 import { registerOAuthRoutes } from "./oauth";
 import { registerPasswordAuthRoutes } from "./passwordAuth";
@@ -45,6 +46,7 @@ registerMagazineUploadRoute(app);
 registerSitemapRoute(app);
 registerRssRoute(app);
 registerAnalyticsTrackingRoute(app);
+registerCronRoute(app);
 app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 
 // Surface unexpected errors as JSON instead of letting the function crash silently.

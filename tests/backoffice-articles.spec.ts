@@ -29,7 +29,7 @@ test.describe.serial("editor de artigo — ciclo de vida via UI", () => {
 
     // Publicar guarda tudo antes de publicar (ver ArticleEditor.tsx
     // handlePublish), por isso não é preciso um "Guardar" à parte primeiro.
-    await page.getByRole("button", { name: "Publicar", exact: true }).click();
+    await page.getByRole("button", { name: "Publicar agora", exact: true }).click();
     await expect(page.getByText("Publicado", { exact: true })).toBeVisible({ timeout: 10000 });
   });
 
@@ -43,8 +43,8 @@ test.describe.serial("editor de artigo — ciclo de vida via UI", () => {
     await page.getByRole("button", { name: "Retirar", exact: true }).click();
     await expect(page.getByText("Rascunho", { exact: true })).toBeVisible({ timeout: 10000 });
 
-    await page.getByRole("button", { name: "Apagar rascunho" }).click();
-    await page.getByRole("button", { name: "Apagar rascunho" }).last().click();
+    await page.getByRole("button", { name: "Apagar", exact: true }).click();
+    await page.getByRole("button", { name: "Apagar", exact: true }).last().click();
     await page.waitForURL(/\/redacao$/);
   });
 
@@ -58,6 +58,74 @@ test.describe.serial("editor de artigo — ciclo de vida via UI", () => {
       await admin.editorial.manage.deleteDraft.mutate({ id: articleId });
     } catch {
       // já tinha sido apagado pelo próprio teste — nada a fazer.
+    }
+  });
+});
+
+// Vercel Hobby's cron minimum interval is once a day, so "scheduled for day
+// X" means the daily cron (server/_core/cron.ts, GET /api/cron/publish-scheduled)
+// flips it to published sometime that day — this drives that whole path:
+// UI scheduling → stays hidden → cron backdated via direct SQL → published.
+test.describe.serial("agendamento de artigos", () => {
+  const title = e2eName("Agendado de UI");
+  let articleId: number;
+  let slug: string;
+
+  test("agendar um artigo para uma data futura", async ({ page }) => {
+    await page.goto("/redacao");
+    await page.getByRole("button", { name: "Novo artigo" }).click();
+    await page.waitForURL(/\/redacao\/\d+/);
+    articleId = Number(page.url().split("/").pop());
+
+    await page.getByLabel(/título \(destaque e notícias\)/i).fill(title);
+    await page.getByLabel(/autoria/i).fill("Autor de Teste Agendamento");
+
+    const future = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await page.getByLabel(/ou agendar para uma data/i).fill(future);
+    await page.getByRole("button", { name: "Agendar", exact: true }).click();
+    await expect(page.getByText(/agendado —/i)).toBeVisible({ timeout: 10000 });
+
+    const admin = apiClient(await devLoginCookie("admin"));
+    const detail = await admin.editorial.manage.detail.query({ id: articleId });
+    slug = detail!.slug;
+  });
+
+  test("artigo agendado não aparece no site nem abre pelo endereço direto", async ({ page }) => {
+    await page.goto("/noticias");
+    await expect(page.getByText(title)).toHaveCount(0);
+    // A app é uma SPA — o servidor devolve sempre 200 (index.html); é o
+    // próprio React que decide mostrar "404" quando bySlug não encontra
+    // nenhum artigo publicado com este slug.
+    await page.goto(`/artigo/${slug}`);
+    await expect(page.getByText(/404/)).toBeVisible();
+  });
+
+  test("o cron publica assim que a data agendada passa", async ({ page }) => {
+    // Sem base de dados de teste separada — recuar a data diretamente é o
+    // único jeito de simular "o dia agendado chegou" sem esperar dias reais.
+    await import("dotenv/config");
+    const mysql = await import("mysql2/promise");
+    const conn = await mysql.createConnection(process.env.DATABASE_URL!);
+    await conn.query("UPDATE articles SET scheduledAt = DATE_SUB(NOW(), INTERVAL 1 HOUR) WHERE id = ?", [articleId]);
+    await conn.end();
+
+    const cronResp = await page.request.get("/api/cron/publish-scheduled");
+    expect(cronResp.ok()).toBeTruthy();
+    const body = await cronResp.json();
+    expect(body.published).toBeGreaterThanOrEqual(1);
+
+    await page.goto("/noticias");
+    await expect(page.getByText(title)).toBeVisible();
+  });
+
+  test.afterAll(async () => {
+    if (!articleId) return;
+    const admin = apiClient(await devLoginCookie("admin"));
+    try {
+      await admin.editorial.manage.publish.mutate({ id: articleId, published: false });
+      await admin.editorial.manage.deleteDraft.mutate({ id: articleId });
+    } catch {
+      // já tinha sido apagado — nada a fazer.
     }
   });
 });

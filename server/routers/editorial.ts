@@ -18,6 +18,7 @@ import {
   searchPublishedArticles,
   replaceArticleImages,
   replaceArticleSections,
+  scheduleArticle,
   setArticleCategories,
   setArticleStatus,
   updateArticleMetadata,
@@ -136,10 +137,18 @@ export const editorialRouter = router({
       await setArticleStatus(input.id, input.published ? "published" : "draft");
       return getArticleWithContent(input.id);
     }),
+    schedule: protectedProcedure.input(z.object({ id: z.number().int().positive(), scheduledAt: z.coerce.date() })).mutation(async ({ ctx, input }) => {
+      await assertCanManageArticle(ctx, input.id);
+      if (input.scheduledAt.getTime() <= Date.now()) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "A data de agendamento tem de ser no futuro." });
+      }
+      await scheduleArticle(input.id, input.scheduledAt);
+      return getArticleWithContent(input.id);
+    }),
     deleteDraft: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const article = await assertCanManageArticle(ctx, input.id);
-      if (article.status !== "draft") {
-        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Só é possível apagar rascunhos." });
+      if (article.status === "published") {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Só é possível apagar rascunhos ou artigos agendados." });
       }
       await deleteArticle(input.id);
       return { success: true as const, id: input.id };
