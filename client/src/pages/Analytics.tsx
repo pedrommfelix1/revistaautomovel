@@ -2,11 +2,12 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
 import { trpc } from "@/lib/trpc";
 
-function StatTile({ label, value }: { label: string; value: string }) {
+function StatTile({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="border border-black p-4">
       <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-neutral-500">{label}</p>
       <p className="mt-3 text-3xl font-black tracking-[-0.07em]">{value}</p>
+      {note && <p className="mt-2 text-[10px] leading-snug text-neutral-400">{note}</p>}
     </div>
   );
 }
@@ -105,7 +106,11 @@ export default function Analytics() {
                 <StatTile label="Tempo médio no artigo" value={formatSeconds(data.avgArticleReadSeconds)} />
                 <StatTile label="Taxa de cliques em partilhar" value={formatPercent(data.shareClickRate)} />
                 <StatTile label="Artigos por visita" value={data.avgArticlesPerVisit.toFixed(1)} />
-                <StatTile label="Taxa de rejeição" value={formatPercent(data.bounceRate)} />
+                <StatTile
+                  label="Taxa de rejeição"
+                  value={formatPercent(data.bounceRate)}
+                  note="Percentagem de visitas que só viram uma página e saíram, sem ir a mais nenhuma parte do site. Não é necessariamente mau — alguém que lê um artigo inteiro e fecha também conta como rejeição."
+                />
                 <StatTile label="Cliques totais" value={data.totalClicks.toLocaleString("pt-PT")} />
               </div>
             </div>
