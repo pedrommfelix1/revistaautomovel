@@ -10,7 +10,30 @@ function upsertMeta(selector: string, attribute: "name" | "property", value: str
   element.content = content;
 }
 
-export function useArticleHead(input: { title?: string | null; description?: string | null; image?: string | null; slug?: string | null }) {
+function upsertJsonLd(id: string, data: Record<string, unknown> | null) {
+  let script = document.getElementById(id) as HTMLScriptElement | null;
+  if (!data) {
+    script?.remove();
+    return;
+  }
+  if (!script) {
+    script = document.createElement("script");
+    script.id = id;
+    script.type = "application/ld+json";
+    document.head.appendChild(script);
+  }
+  script.textContent = JSON.stringify(data);
+}
+
+export function useArticleHead(input: {
+  title?: string | null;
+  description?: string | null;
+  image?: string | null;
+  slug?: string | null;
+  authorName?: string | null;
+  publishedAt?: Date | string | null;
+  updatedAt?: Date | string | null;
+}) {
   useEffect(() => {
     const title = input.title?.trim() || "Auto Turbo";
     const description = input.description?.trim() || "Ensaios, cultura e design automóvel com uma leitura editorial cuidada.";
@@ -20,13 +43,13 @@ export function useArticleHead(input: { title?: string | null; description?: str
     upsertMeta('meta[property="og:description"]', "property", "og:description", description);
     upsertMeta('meta[name="twitter:title"]', "name", "twitter:title", title);
     upsertMeta('meta[name="twitter:description"]', "name", "twitter:description", description);
-    if (input.image) {
-      const imageUrl = input.image.startsWith("http") ? input.image : `${window.location.origin}${input.image}`;
+    const imageUrl = input.image ? (input.image.startsWith("http") ? input.image : `${window.location.origin}${input.image}`) : null;
+    if (imageUrl) {
       upsertMeta('meta[property="og:image"]', "property", "og:image", imageUrl);
       upsertMeta('meta[name="twitter:image"]', "name", "twitter:image", imageUrl);
     }
-    if (input.slug) {
-      const canonical = `${window.location.origin}/artigo/${input.slug}`;
+    const canonical = input.slug ? `${window.location.origin}/artigo/${input.slug}` : null;
+    if (canonical) {
       let link = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
       if (!link) {
         link = document.createElement("link");
@@ -35,5 +58,31 @@ export function useArticleHead(input: { title?: string | null; description?: str
       }
       link.href = canonical;
     }
-  }, [input.title, input.description, input.image, input.slug]);
+
+    // NewsArticle structured data — one of the technical signals Google's
+    // algorithmic News/Top-stories inclusion looks at (no manual submission
+    // exists any more; eligibility is entirely automated based on content
+    // quality plus signals like this).
+    const jsonLd = input.slug
+      ? {
+          "@context": "https://schema.org",
+          "@type": "NewsArticle",
+          headline: title,
+          description,
+          ...(imageUrl ? { image: [imageUrl] } : {}),
+          ...(input.publishedAt ? { datePublished: new Date(input.publishedAt).toISOString() } : {}),
+          ...(input.updatedAt ? { dateModified: new Date(input.updatedAt).toISOString() } : {}),
+          ...(input.authorName ? { author: { "@type": "Person", name: input.authorName } } : {}),
+          publisher: {
+            "@type": "Organization",
+            name: "Auto Turbo",
+            logo: { "@type": "ImageObject", url: `${window.location.origin}/favicon.png` },
+          },
+          mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
+        }
+      : null;
+    upsertJsonLd("article-jsonld", jsonLd);
+
+    return () => upsertJsonLd("article-jsonld", null);
+  }, [input.title, input.description, input.image, input.slug, input.authorName, input.publishedAt, input.updatedAt]);
 }

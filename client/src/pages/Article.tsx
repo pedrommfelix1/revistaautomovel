@@ -298,7 +298,15 @@ function ArticleSections({ article, galleryCount, onActiveImageChange, mobileIma
 export default function Article() {
   const [, params] = useRoute("/artigo/:slug");
   const { data: article, isLoading } = trpc.editorial.bySlug.useQuery({ slug: params?.slug ?? "" }, { enabled: Boolean(params?.slug) });
-  useArticleHead({ title: article?.seoTitle || article?.title, description: article?.seoDescription || article?.deck, image: article?.socialImageUrl || article?.coverImageUrl, slug: article?.slug });
+  useArticleHead({
+    title: article?.seoTitle || article?.title,
+    description: article?.seoDescription || article?.deck,
+    image: article?.socialImageUrl || article?.coverImageUrl,
+    slug: article?.slug,
+    authorName: article?.authorName,
+    publishedAt: article?.publishedAt ?? article?.createdAt,
+    updatedAt: article?.updatedAt,
+  });
   const [magazine, toggleMagazine] = useMagazineMode();
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   // Only ever advances — scrolling back up (or a jittery scroll position)

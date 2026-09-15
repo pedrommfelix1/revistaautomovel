@@ -165,6 +165,18 @@ test.describe.serial("artigo de teste — título duplo, parágrafos, categorias
     await expect(page.getByRole("heading", { level: 1 })).not.toContainText(listTitle);
   });
 
+  test("o artigo publicado inclui dados estruturados NewsArticle", async ({ page }) => {
+    await page.goto(`/artigo/${articleSlug}`);
+    const jsonLd = await page.locator("#article-jsonld").textContent();
+    const data = JSON.parse(jsonLd ?? "{}");
+    expect(data["@type"]).toBe("NewsArticle");
+    // NewsArticle headline comes from seoTitle||title (search-facing), not
+    // articleTitle (the in-page H1) — the fixture leaves seoTitle unset.
+    expect(data.headline).toBe(listTitle);
+    expect(data.author?.name).toBe("Autor de Teste");
+    expect(data.datePublished).toBeTruthy();
+  });
+
   test("a marca aparece antes do tipo", async ({ page }) => {
     await page.goto(`/artigo/${articleSlug}`);
     const tag = page.locator(".article-title-area >> text=/\\//").first();
