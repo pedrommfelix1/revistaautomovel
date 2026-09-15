@@ -68,7 +68,7 @@ export default function Home() {
           )}
         </section>
 
-        <section className="editorial-shell mt-16 sm:mt-24"><div className="mb-7 flex items-center justify-between gap-4 border-t-2 border-black pt-5"><h2 className="text-[11px] font-bold uppercase tracking-[0.14em]">Últimas linhas</h2><Link href="/noticias" className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] hover:text-[#f0372f]">Ver arquivo <ArrowRight size={14} /></Link></div>{following.length ? <div className="grid gap-x-7 gap-y-14 sm:grid-cols-2 lg:grid-cols-3">{following.slice(0, 6).map((article, index) => <ArticleCard key={article.id} article={article} index={index + 1} />)}</div> : <p className="text-neutral-500">Novas histórias serão publicadas em breve.</p>}</section>
+        <section className="editorial-shell mt-16 sm:mt-24"><div className="mb-7 flex items-center justify-between gap-4 border-t-2 border-black pt-5"><h2 className="text-[11px] font-bold uppercase tracking-[0.14em]">Últimos ensaios</h2><Link href="/noticias" className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] hover:text-[#f0372f]">Ver todos <ArrowRight size={14} /></Link></div>{following.length ? <div className="grid gap-x-7 gap-y-14 sm:grid-cols-2 lg:grid-cols-3">{following.slice(0, 6).map((article, index) => <ArticleCard key={article.id} article={article} index={index + 1} />)}</div> : <p className="text-neutral-500">Novas histórias serão publicadas em breve.</p>}</section>
 
       </main>
       <EditorialFooter />
