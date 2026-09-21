@@ -40,7 +40,7 @@ export default function Home() {
       <EditorialHeader />
       <main className="flex-1">
         <section className="editorial-shell pt-8 sm:pt-12">
-          <div className="mb-7 flex items-center justify-between gap-x-6"><h2 className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.14em]"><span className="h-3 w-3 bg-[#f0372f]" /> Em destaque</h2><PublishingNote /></div>
+          <div className="mb-7 flex items-center justify-between gap-x-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-x-6"><h2 className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.14em]"><span className="h-3 w-3 bg-[#f0372f]" /> Em destaque</h2><PublishingNote className="sm:justify-self-center" /></div>
           {featuredLoading ? (
             <div className="aspect-[16/8] animate-pulse bg-neutral-100" />
           ) : featured.length ? (
