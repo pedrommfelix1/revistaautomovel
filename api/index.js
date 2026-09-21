@@ -1786,7 +1786,7 @@ var imageInput = z2.object({
   storageKey: z2.string().max(600).nullable().optional(),
   altText: z2.string().max(250).nullable().optional(),
   caption: z2.string().max(600).nullable().optional(),
-  position: z2.number().int().min(0).max(9)
+  position: z2.number().int().min(0).max(49)
 });
 var metadataInput = z2.object({
   id: z2.number().int().positive(),
@@ -1860,7 +1860,7 @@ var editorialRouter = router({
       await replaceArticleSections(input.id, input.sections);
       return getArticleWithContent(input.id);
     }),
-    saveImages: protectedProcedure.input(z2.object({ id: z2.number().int().positive(), images: z2.array(imageInput).max(10) })).mutation(async ({ ctx, input }) => {
+    saveImages: protectedProcedure.input(z2.object({ id: z2.number().int().positive(), images: z2.array(imageInput).max(50) })).mutation(async ({ ctx, input }) => {
       await assertCanManageArticle(ctx, input.id);
       await replaceArticleImages(input.id, input.images);
       return getArticleWithContent(input.id);
