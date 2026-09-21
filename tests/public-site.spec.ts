@@ -23,6 +23,11 @@ test.describe("navegação pública — smoke", () => {
     await expect(page.getByText(/em destaque/i)).toBeVisible();
   });
 
+  test("início mostra a nota de periodicidade ao lado de «Em destaque»", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("publishing-note")).toHaveText("Textos todas as segundas e quintas");
+  });
+
   test("notícias mostra os dois dropdowns de filtro", async ({ page }) => {
     await page.goto("/noticias");
     await expect(page.getByLabel(/tipo de carro/i)).toBeVisible();
@@ -186,6 +191,11 @@ test.describe.serial("artigo de teste — título duplo, parágrafos, categorias
     await page.goto(`/artigo/${articleSlug}`);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(insideTitle);
     await expect(page.getByRole("heading", { level: 1 })).not.toContainText(listTitle);
+  });
+
+  test("o artigo mostra a nota de periodicidade", async ({ page }) => {
+    await page.goto(`/artigo/${articleSlug}`);
+    await expect(page.getByTestId("publishing-note")).toHaveText("Textos todas as segundas e quintas");
   });
 
   test("o artigo publicado inclui dados estruturados NewsArticle", async ({ page }) => {

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { apiClient, devLoginCookie, e2eName } from "./helpers";
+import { apiClient, devLoginCookie, e2eName, expectErrorCode } from "./helpers";
 
 // Drives the real editor UI end to end — as opposed to public-site.spec.ts's
 // fixture article, which is built directly through the API. Between the
@@ -123,6 +123,99 @@ test.describe.serial("agendamento de artigos", () => {
     const admin = apiClient(await devLoginCookie("admin"));
     try {
       await admin.editorial.manage.publish.mutate({ id: articleId, published: false });
+      await admin.editorial.manage.deleteDraft.mutate({ id: articleId });
+    } catch {
+      // já tinha sido apagado — nada a fazer.
+    }
+  });
+});
+
+// A pré-visualização mostra um rascunho com o layout real do artigo, numa
+// rota só para a redação (/redacao/:id/preview) — o site público só serve
+// artigos publicados, por isso um rascunho nunca se abre por /artigo/:slug.
+test.describe.serial("pré-visualização de artigo", () => {
+  const title = e2eName("Preview de UI");
+  let articleId: number;
+  let slug: string;
+
+  test("o botão guarda as alterações e abre a pré-visualização num novo separador", async ({ page }) => {
+    await page.goto("/redacao");
+    await page.getByRole("button", { name: "Novo artigo" }).click();
+    await page.waitForURL(/\/redacao\/\d+/);
+    articleId = Number(page.url().split("/").pop());
+
+    await page.getByLabel(/título \(destaque e notícias\)/i).fill(title);
+    await page.getByLabel(/título no artigo/i).fill("Título de pré-visualização");
+    await page.getByLabel(/autoria/i).fill("Autor de Teste Preview");
+    await page.getByRole("button", { name: "Texto", exact: true }).click();
+    await page.getByPlaceholder("Escreva o texto deste bloco…").fill("Texto ainda por guardar, escrito no editor.");
+
+    // Sem clicar em "Guardar" antes: o próprio botão tem de guardar.
+    const popupPromise = page.waitForEvent("popup");
+    await page.getByRole("button", { name: "Pré-visualizar", exact: true }).click();
+    const preview = await popupPromise;
+    await preview.waitForURL(new RegExp(`/redacao/${articleId}/preview$`));
+
+    await expect(preview.getByTestId("preview-banner")).toContainText("Rascunho");
+    await expect(preview.getByRole("heading", { level: 1, name: "Título de pré-visualização" })).toBeVisible();
+    await expect(preview.getByText("Texto ainda por guardar, escrito no editor.")).toBeVisible();
+    await expect(preview.getByRole("button", { name: /partilhar/i })).toHaveCount(0);
+
+    const admin = apiClient(await devLoginCookie("admin"));
+    slug = (await admin.editorial.manage.detail.query({ id: articleId }))!.slug;
+  });
+
+  test("o rascunho continua sem abrir no site público", async ({ page }) => {
+    await page.goto(`/artigo/${slug}`);
+    await expect(page.getByText(/404/)).toBeVisible();
+  });
+
+  test.describe("sem sessão", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    test("a pré-visualização pede sessão e não mostra o rascunho", async ({ page }) => {
+      await page.goto(`/redacao/${articleId}/preview`);
+      await expect(page.getByText(/inicie sessão na redação/i)).toBeVisible();
+      await expect(page.getByText("Texto ainda por guardar, escrito no editor.")).toHaveCount(0);
+    });
+  });
+
+  test.afterAll(async () => {
+    if (!articleId) return;
+    const admin = apiClient(await devLoginCookie("admin"));
+    try {
+      await admin.editorial.manage.deleteDraft.mutate({ id: articleId });
+    } catch {
+      // já tinha sido apagado — nada a fazer.
+    }
+  });
+});
+
+// O limite da galeria do artigo subiu de 10 para 50 imagens (o antigo max()
+// do array E o max() de "position" tinham de subir juntos — este segundo é
+// fácil de esquecer, por isso o teste cobre os dois).
+test.describe.serial("limite de imagens da galeria do artigo", () => {
+  const title = e2eName("Galeria de limite");
+  let articleId: number;
+
+  test("aceita exatamente 50 imagens mas rejeita a 51.ª", async () => {
+    const admin = apiClient(await devLoginCookie("admin"));
+    const created = await admin.editorial.manage.create.mutate({ title });
+    articleId = created!.id;
+
+    const fiftyImages = Array.from({ length: 50 }, (_, index) => ({ url: `https://picsum.photos/seed/${articleId}-${index}/800/600`, position: index }));
+    await admin.editorial.manage.saveImages.mutate({ id: articleId, images: fiftyImages });
+    const detail = await admin.editorial.manage.detail.query({ id: articleId });
+    expect(detail!.images).toHaveLength(50);
+
+    const fiftyOneImages = [...fiftyImages, { url: "https://picsum.photos/seed/extra/800/600", position: 50 }];
+    await expectErrorCode(admin.editorial.manage.saveImages.mutate({ id: articleId, images: fiftyOneImages }), "BAD_REQUEST");
+  });
+
+  test.afterAll(async () => {
+    if (!articleId) return;
+    const admin = apiClient(await devLoginCookie("admin"));
+    try {
       await admin.editorial.manage.deleteDraft.mutate({ id: articleId });
     } catch {
       // já tinha sido apagado — nada a fazer.

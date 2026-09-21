@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { EditorialFooter } from "@/components/EditorialFooter";
 import { EditorialHeader } from "@/components/EditorialHeader";
 import { PhotoGallery } from "@/components/PhotoGallery";
+import { PublishingNote } from "@/components/PublishingNote";
 import { useArticleHead } from "@/components/Head";
 import { trackClick } from "@/lib/analytics";
 import { trpc } from "@/lib/trpc";
@@ -295,18 +296,11 @@ function ArticleSections({ article, galleryCount, onActiveImageChange, mobileIma
   );
 }
 
-export default function Article() {
-  const [, params] = useRoute("/artigo/:slug");
-  const { data: article, isLoading } = trpc.editorial.bySlug.useQuery({ slug: params?.slug ?? "" }, { enabled: Boolean(params?.slug) });
-  useArticleHead({
-    title: article?.seoTitle || article?.title,
-    description: article?.seoDescription || article?.deck,
-    image: article?.socialImageUrl || article?.coverImageUrl,
-    slug: article?.slug,
-    authorName: article?.authorName,
-    publishedAt: article?.publishedAt ?? article?.createdAt,
-    updatedAt: article?.updatedAt,
-  });
+// The reader-facing presentation of an article, shared by the public page
+// and the backoffice preview so the preview can never drift from what
+// readers actually see. `preview` swaps out the bits that only make sense
+// for a published article (back-to-index link, share button).
+export function ArticleView({ article, preview }: { article: ArticleData; preview?: { backHref: string } }) {
   const [magazine, toggleMagazine] = useMagazineMode();
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   // Only ever advances — scrolling back up (or a jittery scroll position)
@@ -314,7 +308,6 @@ export default function Article() {
   const handleActiveImageChange = useCallback((index: number) => setActiveImageIndex((current) => Math.max(current, index)), []);
 
   const galleryFrames = useMemo<GalleryFrame[]>(() => {
-    if (!article) return [];
     const frames: GalleryFrame[] = [];
     if (article.coverImageUrl) frames.push({ url: article.coverImageUrl, caption: article.coverImageCaption });
     article.images.forEach((image) => frames.push({ url: image.url, caption: image.caption }));
@@ -323,15 +316,9 @@ export default function Article() {
 
   // The cover already appears once at the top of the page, so mobile's
   // inline gallery weaves in the rest of the article's own photos only.
-  const mobileGalleryImages = useMemo<GalleryFrame[]>(() => {
-    if (!article) return [];
-    return article.images.map((image) => ({ url: image.url, caption: image.caption }));
-  }, [article]);
+  const mobileGalleryImages = useMemo<GalleryFrame[]>(() => article.images.map((image) => ({ url: image.url, caption: image.caption })), [article]);
 
-  useEffect(() => { setActiveImageIndex(0); }, [article?.id]);
-
-  if (isLoading) return <div className="min-h-screen bg-white"><EditorialHeader /><div className="editorial-shell py-28 font-mono text-xs uppercase tracking-[0.15em]">A preparar leitura…</div></div>;
-  if (!article) return <div className="flex min-h-screen flex-col bg-white"><EditorialHeader /><main className="editorial-shell flex-1 py-28"><p className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#f0372f]">404 / Artigo indisponível</p><h1 className="mt-4 max-w-xl text-5xl font-black tracking-[-0.07em]">Esta estrada não tem história.</h1><Link href="/" className="mt-8 inline-flex items-center gap-2 border-b-2 border-black pb-1 text-sm font-bold uppercase tracking-[0.1em]"><ArrowLeft size={16} /> Voltar ao início</Link></main><EditorialFooter /></div>;
+  useEffect(() => { setActiveImageIndex(0); }, [article.id]);
 
   const readTime = estimateReadingMinutes(article.sections);
   return (
@@ -339,9 +326,10 @@ export default function Article() {
       <EditorialHeader />
       <main className="flex-1">
         <div className="editorial-shell pt-7 sm:pt-11">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <Link href="/" className="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-500 transition-colors hover:text-black"><ArrowLeft size={14} /> Índice</Link>
-            <button onClick={toggleMagazine} className="hidden items-center gap-2 border border-black px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition-colors hover:bg-black hover:text-white sm:inline-flex">
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 sm:grid sm:grid-cols-[1fr_auto_1fr]">
+            <Link href={preview?.backHref ?? "/"} className="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-500 transition-colors hover:text-black"><ArrowLeft size={14} /> {preview ? "Voltar ao editor" : "Índice"}</Link>
+            <PublishingNote className="sm:justify-self-center" />
+            <button onClick={toggleMagazine} className="hidden items-center gap-2 border border-black px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition-colors hover:bg-black hover:text-white sm:inline-flex sm:justify-self-end">
               <Newspaper size={13} /> {magazine ? "Ver em modo leitura" : "Experimentar modo revista"}
             </button>
           </div>
@@ -355,7 +343,7 @@ export default function Article() {
                 <span>Por <strong className="text-black">{article.authorName}</strong></span>
                 <span>{formatFullDate(article.publishedAt ?? article.createdAt)}</span>
                 <span className="flex items-center gap-1.5"><Clock3 size={13} /> {readTime} min</span>
-                <ShareButton title={article.articleTitle || article.title} deck={article.deck} />
+                {!preview && <ShareButton title={article.articleTitle || article.title} deck={article.deck} />}
               </div>
             </div>
 
@@ -369,4 +357,23 @@ export default function Article() {
       <EditorialFooter />
     </div>
   );
+}
+
+export default function Article() {
+  const [, params] = useRoute("/artigo/:slug");
+  const { data: article, isLoading } = trpc.editorial.bySlug.useQuery({ slug: params?.slug ?? "" }, { enabled: Boolean(params?.slug) });
+  useArticleHead({
+    title: article?.seoTitle || article?.title,
+    description: article?.seoDescription || article?.deck,
+    image: article?.socialImageUrl || article?.coverImageUrl,
+    slug: article?.slug,
+    authorName: article?.authorName,
+    publishedAt: article?.publishedAt ?? article?.createdAt,
+    updatedAt: article?.updatedAt,
+  });
+
+  if (isLoading) return <div className="min-h-screen bg-white"><EditorialHeader /><div className="editorial-shell py-28 font-mono text-xs uppercase tracking-[0.15em]">A preparar leitura…</div></div>;
+  if (!article) return <div className="flex min-h-screen flex-col bg-white"><EditorialHeader /><main className="editorial-shell flex-1 py-28"><p className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#f0372f]">404 / Artigo indisponível</p><h1 className="mt-4 max-w-xl text-5xl font-black tracking-[-0.07em]">Esta estrada não tem história.</h1><Link href="/" className="mt-8 inline-flex items-center gap-2 border-b-2 border-black pb-1 text-sm font-bold uppercase tracking-[0.1em]"><ArrowLeft size={16} /> Voltar ao início</Link></main><EditorialFooter /></div>;
+
+  return <ArticleView article={article} />;
 }

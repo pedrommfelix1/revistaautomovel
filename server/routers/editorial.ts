@@ -40,7 +40,7 @@ const imageInput = z.object({
   storageKey: z.string().max(600).nullable().optional(),
   altText: z.string().max(250).nullable().optional(),
   caption: z.string().max(600).nullable().optional(),
-  position: z.number().int().min(0).max(9),
+  position: z.number().int().min(0).max(49),
 });
 
 const metadataInput = z.object({
@@ -122,7 +122,7 @@ export const editorialRouter = router({
       await replaceArticleSections(input.id, input.sections);
       return getArticleWithContent(input.id);
     }),
-    saveImages: protectedProcedure.input(z.object({ id: z.number().int().positive(), images: z.array(imageInput).max(10) })).mutation(async ({ ctx, input }) => {
+    saveImages: protectedProcedure.input(z.object({ id: z.number().int().positive(), images: z.array(imageInput).max(50) })).mutation(async ({ ctx, input }) => {
       await assertCanManageArticle(ctx, input.id);
       await replaceArticleImages(input.id, input.images);
       return getArticleWithContent(input.id);

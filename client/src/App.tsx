@@ -13,6 +13,7 @@ import Home from "./pages/Home";
 import News from "./pages/News";
 import EditorialDesk from "./pages/EditorialDesk";
 import ArticleEditor from "./pages/ArticleEditor";
+import ArticlePreview from "./pages/ArticlePreview";
 import Account from "./pages/Account";
 import Analytics from "./pages/Analytics";
 import Search from "./pages/Search";
@@ -86,6 +87,7 @@ function Router() {
         <Route path={"/redacao/conta"} component={Account} />
         <Route path={"/redacao/site"} component={SiteSettings} />
         <Route path={"/redacao/metricas"} component={Analytics} />
+        <Route path={"/redacao/:id/preview"} component={ArticlePreview} />
         <Route path={"/redacao/:id"} component={ArticleEditor} />
         <Route path={"/404"} component={NotFound} />
         {/* Final fallback route */}
