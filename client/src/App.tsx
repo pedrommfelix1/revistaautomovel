@@ -3,10 +3,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { Route, Switch, useLocation } from "wouter";
+import { CookieConsent } from "./components/CookieConsent";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { trackPageview, trackTiming } from "./lib/analytics";
 import About from "./pages/About";
+import Privacy from "./pages/Privacy";
 import Article from "./pages/Article";
 import Category from "./pages/Category";
 import Home from "./pages/Home";
@@ -76,12 +78,14 @@ function Router() {
     <>
       <ScrollToTop />
       <PageviewTracker />
+      <CookieConsent />
       <Switch>
         <Route path={"/"} component={Home} />
         <Route path={"/artigo/:slug"} component={Article} />
         <Route path={"/categoria/:slug"} component={Category} />
         <Route path={"/noticias"} component={News} />
         <Route path={"/sobre"} component={About} />
+        <Route path={"/privacidade"} component={Privacy} />
         <Route path={"/pesquisa"} component={Search} />
         <Route path={"/redacao"} component={EditorialDesk} />
         <Route path={"/redacao/conta"} component={Account} />
