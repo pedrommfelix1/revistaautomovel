@@ -189,7 +189,7 @@
      the site) — a legitimate stand-in for the client's still-unlicensed
      DIN/Mini Pro, until real licensed files are available. */
   .article-title-area h1 { max-width: 900px; font-family: Arial, sans-serif; font-size: clamp(2.6rem, 6vw, 6rem); font-weight: 700; line-height: 0.88; letter-spacing: -0.03em; overflow-wrap: break-word; word-break: normal; }
-  .publishing-note { font-family: Arial, sans-serif; font-size: clamp(1.875rem, 6.5vw, 4.5rem); font-weight: 700; line-height: 0.92; letter-spacing: -0.03em; color: #000; text-align: center; overflow-wrap: break-word; }
+  .publishing-note-lg { font-size: clamp(1.875rem, 6.5vw, 4.5rem); line-height: 1.05; }
   .article-deck { max-width: 47rem; margin-top: 1.8rem; font-family: Arial, sans-serif; font-size: clamp(1.15rem, 2vw, 1.45rem); font-weight: 400; line-height: 1.42; color: #555; overflow-wrap: anywhere; word-break: break-word; }
   .article-layout { width: min(100% - 2.5rem, 1400px); margin: 2rem auto 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3rem; }
   .article-copy { min-width: 0; }
