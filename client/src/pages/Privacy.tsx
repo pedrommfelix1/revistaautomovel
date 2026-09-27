@@ -16,7 +16,7 @@ export default function Privacy() {
         <div className="mt-10 max-w-3xl space-y-8 border-t-2 border-black pt-8 text-base leading-relaxed text-neutral-700">
           <section>
             <h2 className="mb-2 text-lg font-black tracking-[-0.03em] text-black">Quem somos</h2>
-            <p>O Auto Turbo (autoturbo.pt) é uma plataforma editorial independente sobre automóveis. Não é preciso criar conta nem indicar dados pessoais para ler o site.</p>
+            <p>O Auto Turbo (autoturbo.pt) publica artigos sobre automóveis. Não é preciso criar conta nem indicar dados pessoais para ler o site.</p>
           </section>
 
           <section>
