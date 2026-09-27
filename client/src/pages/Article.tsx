@@ -326,13 +326,13 @@ export function ArticleView({ article, preview }: { article: ArticleData; previe
       <EditorialHeader />
       <main className="flex-1">
         <div className="editorial-shell pt-7 sm:pt-11">
-          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 sm:grid sm:grid-cols-[1fr_auto_1fr]">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <Link href={preview?.backHref ?? "/"} className="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-neutral-500 transition-colors hover:text-black"><ArrowLeft size={14} /> {preview ? "Voltar ao editor" : "Índice"}</Link>
-            <PublishingNote className="sm:justify-self-center" />
-            <button onClick={toggleMagazine} className="hidden items-center gap-2 border border-black px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition-colors hover:bg-black hover:text-white sm:inline-flex sm:justify-self-end">
+            <button onClick={toggleMagazine} className="hidden items-center gap-2 border border-black px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition-colors hover:bg-black hover:text-white sm:inline-flex">
               <Newspaper size={13} /> {magazine ? "Ver em modo leitura" : "Experimentar modo revista"}
             </button>
           </div>
+          <PublishingNote className="mt-6 sm:mt-9" />
 
           <div className={`article-layout mt-8 border-t-2 border-black pt-5 sm:mt-11 sm:pt-7 ${magazine ? "article-layout--magazine" : ""}`}>
             <div className="article-title-area">

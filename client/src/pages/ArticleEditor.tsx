@@ -209,9 +209,11 @@ export default function ArticleEditor() {
     if (!article || !scheduleDate) return;
     await saveAll(false);
     try {
-      // Midday local time, not midnight — avoids the date silently shifting
-      // to the previous day once converted to UTC for storage.
-      const scheduledAt = new Date(`${scheduleDate}T12:00:00`);
+      // 10:00 local time, not midnight — avoids the date silently shifting
+      // to the previous day once converted to UTC for storage. The daily
+      // cron (server/_core/cron.ts) runs later than this in UTC even during
+      // Lisbon's summer DST, so a same-day publish is guaranteed.
+      const scheduledAt = new Date(`${scheduleDate}T10:00:00`);
       await scheduleArticle.mutateAsync({ id: article.id, scheduledAt });
       await detailQuery.refetch();
       toast.success(`Artigo agendado para ${scheduledAt.toLocaleDateString("pt-PT")}.`);
@@ -318,7 +320,7 @@ export default function ArticleEditor() {
               <Input id="schedule-date" type="date" value={scheduleDate} min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)} onChange={(event) => setScheduleDate(event.target.value)} className="editor-input" />
               <Button onClick={() => void handleSchedule()} disabled={!scheduleDate || isSaving || scheduleArticle.isPending} variant="outline" className="h-10 shrink-0 rounded-none border-black text-[10px] font-bold uppercase tracking-[0.1em]"><CalendarClock size={14} /> Agendar</Button>
             </div>
-            <p className="mt-3 font-mono text-[10px] leading-relaxed text-neutral-500">Publica-se automaticamente nessa data (de manhã, hora de Lisboa). Não é possível escolher uma hora exata.</p>
+            <p className="mt-3 font-mono text-[10px] leading-relaxed text-neutral-500">Publica-se automaticamente nessa data, por volta das 10h (hora de Lisboa). Não é possível escolher uma hora diferente.</p>
           </div>
         )}
       </section></aside></div></div><AlertDialog open={deleteDialogOpen} onOpenChange={(open) => { if (!deleteDraft.isPending) setDeleteDialogOpen(open); }}><AlertDialogContent className="rounded-none border-2 border-black"><AlertDialogHeader><AlertDialogTitle>Apagar este artigo?</AlertDialogTitle><AlertDialogDescription>“{metadata.title}” e todo o seu conteúdo serão removidos permanentemente. Esta ação não pode ser desfeita.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={deleteDraft.isPending} className="rounded-none border-black">Cancelar</AlertDialogCancel><AlertDialogAction disabled={deleteDraft.isPending} onClick={() => void handleDeleteDraft()} className="rounded-none bg-[#f0372f] text-white hover:bg-black">{deleteDraft.isPending ? "A apagar…" : "Apagar"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></DashboardLayout>;

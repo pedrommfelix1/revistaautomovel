@@ -8,6 +8,11 @@ import { ENV } from "./env";
 // only thing standing between "scheduled" and "published" for an article,
 // so this must reject anything else, or anyone could force early publication
 // by hitting the URL directly.
+//
+// The cron fires at 11:00 UTC — after every article's fixed 10:00
+// Europe/Lisbon target (09:00 UTC in summer DST, 10:00 UTC in winter),
+// so a day's scheduled articles always go live the same calendar day
+// instead of slipping to the next one.
 export function registerCronRoute(app: Express) {
   app.get("/api/cron/publish-scheduled", async (req: Request, res: Response) => {
     if (ENV.isProduction) {
