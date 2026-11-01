@@ -8,4 +8,5 @@ export const ENV = {
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   cronSecret: process.env.CRON_SECRET ?? "",
+  blobToken: process.env.BLOB_READ_WRITE_TOKEN ?? "",
 };

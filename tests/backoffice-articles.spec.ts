@@ -191,6 +191,48 @@ test.describe.serial("pré-visualização de artigo", () => {
   });
 });
 
+// As fotos vivem num armazenamento Vercel Blob público (já não na Manus): o
+// upload pelo caminho real do backoffice tem de devolver um URL absoluto e
+// acessível por qualquer pessoa, sem passar pelo nosso servidor.
+test.describe.serial("upload de imagens para o armazenamento", () => {
+  const title = e2eName("Upload de imagem");
+  let articleId: number;
+  let blobUrl: string;
+
+  test("a foto fica num URL público do Vercel Blob", async () => {
+    const admin = apiClient(await devLoginCookie("admin"));
+    const created = await admin.editorial.manage.create.mutate({ title });
+    articleId = created!.id;
+
+    const onePixelPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const asset = await admin.editorial.manage.uploadImage.mutate({ id: articleId, dataUrl: `data:image/png;base64,${onePixelPng}`, fileName: "pixel.png" });
+    blobUrl = asset.url;
+
+    expect(new URL(asset.url).protocol).toBe("https:");
+    expect(new URL(asset.url).hostname).toMatch(/\.public\.blob\.vercel-storage\.com$/);
+    expect(asset.key).toMatch(/^editorial\//);
+
+    const response = await fetch(asset.url);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+  });
+
+  test.afterAll(async () => {
+    await import("dotenv/config");
+    if (blobUrl) {
+      const { del } = await import("@vercel/blob");
+      await del(blobUrl, { token: process.env.BLOB_READ_WRITE_TOKEN }).catch(() => {});
+    }
+    if (!articleId) return;
+    const admin = apiClient(await devLoginCookie("admin"));
+    try {
+      await admin.editorial.manage.deleteDraft.mutate({ id: articleId });
+    } catch {
+      // já tinha sido apagado — nada a fazer.
+    }
+  });
+});
+
 // O limite da galeria do artigo subiu de 10 para 50 imagens (o antigo max()
 // do array E o max() de "position" tinham de subir juntos — este segundo é
 // fácil de esquecer, por isso o teste cobre os dois).

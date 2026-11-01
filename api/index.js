@@ -167,7 +167,8 @@ var ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
-  cronSecret: process.env.CRON_SECRET ?? ""
+  cronSecret: process.env.CRON_SECRET ?? "",
+  blobToken: process.env.BLOB_READ_WRITE_TOKEN ?? ""
 };
 
 // server/db.ts
@@ -708,74 +709,33 @@ function registerCronRoute(app2) {
 import express from "express";
 
 // server/storage.ts
-function getForgeConfig() {
-  const forgeUrl = ENV.forgeApiUrl;
-  const forgeKey = ENV.forgeApiKey;
-  if (!forgeUrl || !forgeKey) {
-    throw new Error(
-      "Storage config missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
-    );
+import { put } from "@vercel/blob";
+function getToken() {
+  if (!ENV.blobToken) {
+    throw new Error("Storage config missing: set BLOB_READ_WRITE_TOKEN");
   }
-  return { forgeUrl: forgeUrl.replace(/\/+$/, ""), forgeKey };
+  return ENV.blobToken;
 }
 function normalizeKey(relKey) {
   return relKey.replace(/^\/+/, "");
 }
-function appendHashSuffix(relKey) {
-  const hash = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
-  const lastDot = relKey.lastIndexOf(".");
-  if (lastDot === -1) return `${relKey}_${hash}`;
-  return `${relKey.slice(0, lastDot)}_${hash}${relKey.slice(lastDot)}`;
-}
-async function presignPut(relKey) {
-  const { forgeUrl, forgeKey } = getForgeConfig();
-  const key = appendHashSuffix(normalizeKey(relKey));
-  const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
-  presignUrl.searchParams.set("path", key);
-  const presignResp = await fetch(presignUrl, {
-    headers: { Authorization: `Bearer ${forgeKey}` }
-  });
-  if (!presignResp.ok) {
-    const msg = await presignResp.text().catch(() => presignResp.statusText);
-    throw new Error(`Storage presign failed (${presignResp.status}): ${msg}`);
-  }
-  const { url: uploadUrl } = await presignResp.json();
-  if (!uploadUrl) throw new Error("Forge returned empty presign URL");
-  return { key, uploadUrl };
+function blobUrlForKey(key) {
+  const [, , , storeId] = getToken().split("_");
+  return `https://${storeId.toLowerCase()}.public.blob.vercel-storage.com/${normalizeKey(key)}`;
 }
 async function storagePut(relKey, data, contentType = "application/octet-stream") {
-  const { key, uploadUrl: s3Url } = await presignPut(relKey);
-  const blob = typeof data === "string" ? new Blob([data], { type: contentType }) : new Blob([data], { type: contentType });
-  const uploadResp = await fetch(s3Url, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: blob
+  const blob = await put(normalizeKey(relKey), typeof data === "string" ? data : Buffer.from(data), {
+    access: "public",
+    contentType,
+    addRandomSuffix: true,
+    token: getToken()
   });
-  if (!uploadResp.ok) {
-    throw new Error(`Storage upload to S3 failed (${uploadResp.status})`);
-  }
-  return { key, url: `/manus-storage/${key}` };
+  return { key: blob.pathname, url: blob.url };
 }
 async function storageFetchBytes(relKey) {
-  const url = await storageGetSignedUrl(relKey);
-  const resp = await fetch(url);
+  const resp = await fetch(blobUrlForKey(relKey));
   if (!resp.ok) throw new Error(`Storage fetch failed (${resp.status})`);
   return Buffer.from(await resp.arrayBuffer());
-}
-async function storageGetSignedUrl(relKey) {
-  const { forgeUrl, forgeKey } = getForgeConfig();
-  const key = normalizeKey(relKey);
-  const getUrl = new URL("v1/storage/presign/get", forgeUrl + "/");
-  getUrl.searchParams.set("path", key);
-  const resp = await fetch(getUrl, {
-    headers: { Authorization: `Bearer ${forgeKey}` }
-  });
-  if (!resp.ok) {
-    const msg = await resp.text().catch(() => resp.statusText);
-    throw new Error(`Storage signed URL failed (${resp.status}): ${msg}`);
-  }
-  const { url } = await resp.json();
-  return url;
 }
 
 // shared/editorial.ts
